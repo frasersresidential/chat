@@ -1,0 +1,23 @@
+# One-click deploy to Render (https://render.com).
+# In Render: New → Blueprint → connect this repo → it reads this file.
+services:
+  - type: web
+    name: omnichat
+    runtime: node
+    plan: free
+    branch: claude/relaxed-gauss-s9wp05
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: AUTH_SECRET
+        generateValue: true        # Render generates a strong random secret
+      - key: DEMO_PASSWORD
+        sync: false                # set your own in the dashboard
+    # NOTE: a persistent disk is mounted at /app/data so the JSON store and
+    # uploads survive redeploys. (Free plans may restrict disks — remove this
+    # block and accept ephemeral data, or move to a database, if needed.)
+    disk:
+      name: omnichat-data
+      mountPath: /app/data
+      sizeGB: 1

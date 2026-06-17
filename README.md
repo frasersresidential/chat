@@ -29,6 +29,13 @@ WhatsApp Business, LINE OA, X (Twitter), TikTok** — พร้อมระบ�
 | **Notifications** | Assigned agent, supervisor high-priority alerts, in-app bell. |
 | **Admin UI** | Channels, Teams, Users, Routing Rules, plus an inbound Simulator. |
 | **Realtime** | WebSocket push for new messages, conversations, presence, notifications. |
+| **Agent tools** | Image/video/file attachments, canned quick replies, emoji picker, live "typing…" indicator. |
+| **Tags & grading** | Free-form tags + A–F lead grade per conversation; full-text search across chats. |
+| **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
+| **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
+| **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
+| **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
+| **PWA** | Installable, mobile-first; sound + desktop notifications. |
 
 ---
 
@@ -43,6 +50,14 @@ npm start
 No credentials needed — the app seeds a demo org (**Company A**) and runs every
 channel in **simulated mode**. Use the **Simulator** tab (or the Mock webhook)
 to push a customer message through the full routing pipeline.
+
+**Log in** with `u_owner@company-a.com` / `demo1234` (or `u_manager`,
+`u_supervisor`, `u_sales1`, `u_viewer` … same password). Owners/Admins can
+"act as" any user via the top-right switcher.
+
+📦 **Deploy + connect real LINE/Facebook:** see **[CONNECT-CHANNELS-TH.md](CONNECT-CHANNELS-TH.md)**
+(Render blueprint + Dockerfile included). 📱 **Run on Windows / mobile:** see
+**[QUICKSTART-TH.md](QUICKSTART-TH.md)**.
 
 ```bash
 npm test     # routing / round-robin / RBAC unit tests
