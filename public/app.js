@@ -5,6 +5,7 @@ const state = {
   meta: null,
   view: 'inbox',
   inboxMode: 'my',
+  searchQuery: '',
   conversations: [],
   selectedId: null,
   thread: null,
@@ -137,6 +138,8 @@ function connectWs() {
     if (msg.type === 'conversation:upserted' || msg.type === 'message:created') {
       if (state.view === 'inbox') refreshInbox();
       if (msg.type === 'message:created' && msg.conversationId === state.selectedId) openThread(state.selectedId);
+    } else if (msg.type === 'typing') {
+      if (msg.conversationId === state.selectedId && msg.user.id !== state.user.id && msg.isTyping) showTyping(msg.user.name);
     } else if (msg.type === 'notification:created') {
       refreshNotifications();
     } else if (msg.type === 'user:presence') {
@@ -186,6 +189,7 @@ async function renderInbox(main) {
   main.innerHTML = `
     <div class="inbox-layout">
       <div class="panel conv-list">
+        <div class="search-box"><input id="searchInput" placeholder="🔍 ค้นหาแชต / ลูกค้า / ข้อความ" value="${esc(state.searchQuery)}" /></div>
         <div class="conv-tabs" id="inboxTabs">
           <button data-mode="my">My</button>
           <button data-mode="team">Team</button>
@@ -199,10 +203,41 @@ async function renderInbox(main) {
     </div>`;
   $('#inboxTabs').querySelectorAll('button').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === state.inboxMode);
-    b.onclick = () => { state.inboxMode = b.dataset.mode; renderInbox(main); };
+    b.onclick = () => { state.searchQuery = ''; state.inboxMode = b.dataset.mode; renderInbox(main); };
   });
-  await refreshInbox();
+  let searchTimer;
+  $('#searchInput').oninput = (e) => {
+    clearTimeout(searchTimer);
+    const q = e.target.value;
+    searchTimer = setTimeout(() => doSearch(q), 250);
+  };
+  if (state.searchQuery) doSearch(state.searchQuery); else await refreshInbox();
   if (state.selectedId) openThread(state.selectedId);
+}
+
+async function doSearch(q) {
+  state.searchQuery = q;
+  const list = $('#convList');
+  if (!list) return;
+  if (!q.trim()) { return refreshInbox(); }
+  let results = [];
+  try { results = await api('/search?q=' + encodeURIComponent(q)); } catch { results = []; }
+  if (!results.length) { list.innerHTML = '<div class="empty">ไม่พบผลลัพธ์</div>'; return; }
+  const meta = state.meta.channels || {};
+  list.innerHTML = results.map(({ conversation: c, snippet }) => {
+    const m = meta[c.channel] || {};
+    return `
+    <div class="conv-item ${c.id === state.selectedId ? 'active' : ''}" data-id="${c.id}">
+      <div class="conv-avatar" style="background:${m.color || '#1f6feb'}">${m.icon || '👤'}</div>
+      <div class="conv-main">
+        <div class="conv-top"><span class="conv-name">${esc(c.customer?.name)}</span>
+          <span class="conv-time">${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}</span></div>
+        <div class="conv-preview">${snippet ? '💬 ' + esc(snippet) : esc(c.accountName || c.channelLabel)}</div>
+        <div class="conv-meta">${(c.tags || []).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.conv-item').forEach((item) => item.onclick = () => openThread(item.dataset.id));
 }
 
 async function refreshInbox() {
@@ -225,7 +260,9 @@ async function refreshInbox() {
         </div>
         <div class="conv-preview">${esc(c.accountName || c.channelLabel)}</div>
         <div class="conv-meta">
+          ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
           ${c.customer?.vip ? '<span class="chip vip">★ VIP</span>' : ''}
+          ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
           ${c.assignedUserName ? `<span class="chip owner">${esc(c.assignedUserName)}</span>` : '<span class="chip unassigned">Unassigned</span>'}
           ${c.unread ? `<span class="unread-dot">${c.unread}</span>` : ''}
         </div>
@@ -277,11 +314,14 @@ function renderThread() {
           <div class="meta">${esc(m.senderName || '')} · ${timeAgo(m.createdAt)}</div>
         </div>`).join('')}
     </div>
+    <div id="typingInd" class="typing-ind hidden"></div>
     <div id="attachPreview" class="attach-preview"></div>
     <div id="quickPanel" class="quick-panel hidden"></div>
+    <div id="emojiPanel" class="emoji-panel hidden"></div>
     <div class="composer">
       ${replyDisabled ? '' : `
         <button class="btn ghost" id="attachBtn" title="แนบรูป/วิดีโอ/ไฟล์">📎</button>
+        <button class="btn ghost" id="emojiBtn" title="อิโมจิ">😀</button>
         <button class="btn ghost" id="quickBtn" title="คำตอบสำเร็จรูป">⚡</button>
         <input type="file" id="fileInput" accept="image/*,video/*,application/pdf" multiple hidden />`}
       <textarea id="replyInput" placeholder="${replyDisabled ? 'You do not have permission to reply' : 'พิมพ์ข้อความ…'}" ${replyDisabled ? 'disabled' : ''}></textarea>
@@ -302,6 +342,9 @@ function renderThread() {
     };
     $('#sendBtn').onclick = send;
     $('#replyInput').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+    $('#replyInput').oninput = () => sendTyping(c.id);
+    // Emoji picker
+    $('#emojiBtn').onclick = () => toggleEmojiPanel();
     // Attach files
     $('#attachBtn').onclick = () => $('#fileInput').click();
     $('#fileInput').onchange = async (e) => {
@@ -341,6 +384,39 @@ function renderAttachPreview() {
   box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
     state.pendingAttachments.splice(+b.dataset.rm, 1); renderAttachPreview();
   });
+}
+
+// ── Emoji picker ──────────────────────────────────────────────────────────────
+const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤩','🥰','👍','👎','🙏','👌','💪','🙌','👏','🔥','✨','🎉','❤️','💯','✅','❌','⭐','😅','😉','😢','😭','😡','🤔','😴','🥳','😇','🤗','😋','🛒','💰','💳','📦','🚚','📞','📩','⏰','🎁','💵','🏷️','😱','🙇‍♀️','🙇‍♂️','💬'];
+function toggleEmojiPanel() {
+  const p = $('#emojiPanel');
+  if (!p) return;
+  if (!p.classList.contains('hidden')) { p.classList.add('hidden'); return; }
+  p.innerHTML = EMOJIS.map((e) => `<button class="emoji" type="button">${e}</button>`).join('');
+  p.classList.remove('hidden');
+  p.querySelectorAll('.emoji').forEach((b) => b.onclick = () => {
+    const ta = $('#replyInput'); ta.value += b.textContent; ta.focus();
+  });
+}
+
+// ── Typing indicator (real-time over WebSocket) ───────────────────────────────
+let typingTimer = null;
+let typingHideTimer = null;
+function wsSend(obj) {
+  if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify(obj));
+}
+function sendTyping(conversationId) {
+  wsSend({ type: 'typing', conversationId, isTyping: true });
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => wsSend({ type: 'typing', conversationId, isTyping: false }), 2500);
+}
+function showTyping(name) {
+  const ind = $('#typingInd');
+  if (!ind) return;
+  ind.textContent = `${name} กำลังพิมพ์…`;
+  ind.classList.remove('hidden');
+  clearTimeout(typingHideTimer);
+  typingHideTimer = setTimeout(() => ind.classList.add('hidden'), 3000);
 }
 
 function toggleQuickPanel(c) {
@@ -398,10 +474,12 @@ async function assignDialog(c) {
   openThread(c.id); refreshInbox();
 }
 
+const GRADES = ['A', 'B', 'C', 'D', 'E', 'F'];
 function renderDetail() {
   const pane = $('#detailPane');
   if (!pane) return;
   const { conversation: c, assignments } = state.thread;
+  const editable = can('reply');
   pane.innerHTML = `
     <h4>Customer</h4>
     <div class="row"><span class="muted">Name</span><span>${esc(c.customer?.name)}</span></div>
@@ -409,11 +487,43 @@ function renderDetail() {
     <div class="row"><span class="muted">Channel</span><span>${esc(c.channelLabel)}</span></div>
     <div class="row"><span class="muted">Account</span><span>${esc(c.accountName)}</span></div>
     <div class="row"><span class="muted">Owner</span><span>${esc(c.assignedUserName || '—')}</span></div>
+
+    <h4>Grade (เกรดลูกค้า)</h4>
+    <div class="grade-row">
+      ${GRADES.map((g) => `<button class="grade-btn grade-${g} ${c.grade === g ? 'active' : ''}" data-grade="${g}" ${editable ? '' : 'disabled'}>${g}</button>`).join('')}
+      <button class="grade-btn ${!c.grade ? 'active' : ''}" data-grade="" ${editable ? '' : 'disabled'}>—</button>
+    </div>
+
+    <h4>Tags (ป้ายกำกับ)</h4>
+    <div class="tags-row" id="tagsRow">
+      ${(c.tags || []).map((t) => `<span class="tag-chip">${esc(t)}${editable ? `<button data-rmtag="${esc(t)}">✕</button>` : ''}</span>`).join('') || '<span class="muted">ยังไม่มีแท็ก</span>'}
+    </div>
+    ${editable ? `<input id="tagInput" placeholder="เพิ่มแท็ก แล้วกด Enter" />` : ''}
+
     <h4>Assignment history</h4>
     ${assignments.length ? assignments.map((a) => {
       const u = state.users.find((x) => x.id === a.assignedUserId);
       return `<div class="timeline-item"><b>${esc(u?.name || a.assignedUserId)}</b> · ${a.assignmentType} · ${timeAgo(a.assignedAt)}</div>`;
     }).join('') : '<div class="muted">No assignments yet</div>'}`;
+
+  if (!editable) return;
+  pane.querySelectorAll('[data-grade]').forEach((b) => b.onclick = async () => {
+    try {
+      const updated = await api('/conversations/' + c.id + '/grade', { method: 'PUT', body: JSON.stringify({ grade: b.dataset.grade }) });
+      state.thread.conversation = updated; renderDetail(); refreshInbox();
+    } catch (e) { alert(e.message); }
+  });
+  const saveTags = async (tags) => {
+    try {
+      const updated = await api('/conversations/' + c.id + '/tags', { method: 'PUT', body: JSON.stringify({ tags }) });
+      state.thread.conversation = updated; renderDetail(); refreshInbox();
+    } catch (e) { alert(e.message); }
+  };
+  pane.querySelectorAll('[data-rmtag]').forEach((b) => b.onclick = () => saveTags((c.tags || []).filter((t) => t !== b.dataset.rmtag)));
+  const ti = $('#tagInput');
+  if (ti) ti.onkeydown = (e) => {
+    if (e.key === 'Enter' && ti.value.trim()) { e.preventDefault(); saveTags([...(c.tags || []), ti.value.trim()]); }
+  };
 }
 
 // ── Channels admin ─────────────────────────────────────────────────────────────
@@ -697,13 +807,23 @@ async function renderReports(main) {
       </table>
     </div>
 
-    <div class="card">
-      <h3>Assignment distribution</h3>
-      ${Object.keys(r.assignmentByType).length
-        ? Object.entries(r.assignmentByType).map(([k, v]) => bar(k, v, Math.max(1, ...Object.values(r.assignmentByType)), 'var(--orange)')).join('')
-        : '<p class="muted">No assignments yet</p>'}
+    <div class="report-cols">
+      <div class="card">
+        <h3>Lead grade distribution (A–F)</h3>
+        ${(() => { const g = r.byGrade || {}; const max = Math.max(1, ...Object.values(g));
+          return ['A','B','C','D','E','F','ungraded'].map((k) => bar(k === 'ungraded' ? 'ยังไม่จัดเกรด' : `เกรด ${k}`, g[k] || 0, max, gradeColor(k))).join(''); })()}
+      </div>
+      <div class="card">
+        <h3>Assignment distribution</h3>
+        ${Object.keys(r.assignmentByType).length
+          ? Object.entries(r.assignmentByType).map(([k, v]) => bar(k, v, Math.max(1, ...Object.values(r.assignmentByType)), 'var(--orange)')).join('')
+          : '<p class="muted">No assignments yet</p>'}
+      </div>
     </div>
   </div>`;
+}
+function gradeColor(g) {
+  return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';
 }
 
 // ── Simulator ────────────────────────────────────────────────────────────────────

@@ -26,11 +26,26 @@ export function attachRealtime(server) {
     ws.user = user;
     log.info(`connected: ${user.name}`);
     ws.send(JSON.stringify({ type: 'connected', user }));
+
+    // Inbound client messages — currently just "typing" presence relay.
+    ws.on('message', (raw) => {
+      let msg;
+      try { msg = JSON.parse(raw.toString()); } catch { return; }
+      if (msg.type === 'typing') {
+        broadcastOrg(user.organizationId, {
+          type: 'typing',
+          conversationId: msg.conversationId,
+          user: { id: user.id, name: user.name },
+          isTyping: !!msg.isTyping,
+        }, ws);
+      }
+    });
   });
 
-  const broadcastOrg = (organizationId, payload) => {
+  const broadcastOrg = (organizationId, payload, except = null) => {
     const data = JSON.stringify(payload);
     for (const client of wss.clients) {
+      if (client === except) continue;
       if (client.readyState === 1 && client.user?.organizationId === organizationId) {
         client.send(data);
       }

@@ -108,6 +108,54 @@ export function markRead(conversationId) {
   return updated;
 }
 
+export const GRADES = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+/** Set the lead grade (A–F) used for reporting; pass null/'' to clear. */
+export function setGrade(conversationId, grade) {
+  if (grade && !GRADES.includes(grade)) throw new Error('invalid grade');
+  const updated = db.conversations.update(conversationId, { grade: grade || null });
+  if (updated) bus.emit('conversation:upserted', updated);
+  return updated;
+}
+
+/** Replace the conversation's tag list (deduped, trimmed, capped). */
+export function setTags(conversationId, tags) {
+  const clean = Array.from(new Set((tags || []).map((t) => String(t).trim()).filter(Boolean))).slice(0, 20);
+  const updated = db.conversations.update(conversationId, { tags: clean });
+  if (updated) bus.emit('conversation:upserted', updated);
+  return updated;
+}
+
+/**
+ * Search visible conversations by customer name, participant id, tag, grade or
+ * message text. Respects the same RBAC scope as the inbox.
+ */
+export function searchConversations(user, q) {
+  const term = String(q || '').toLowerCase().trim();
+  if (!term) return [];
+  const canSeeAll = can(user, PERMISSIONS.VIEW_ALL_CONVERSATIONS);
+  const myTeams = new Set(teamsForUser(user.id));
+  const teamMemberIds = new Set(db.teamMembers.filter((m) => myTeams.has(m.teamId)).map((m) => m.userId));
+  const visible = (c) =>
+    canSeeAll || c.assignedUserId === user.id || (c.assignedUserId && teamMemberIds.has(c.assignedUserId));
+
+  const results = [];
+  for (const c of db.conversations.filter((c) => c.organizationId === user.organizationId && visible(c))) {
+    const hay = [c.customer?.name, c.participantId, (c.tags || []).join(' '), c.grade]
+      .filter(Boolean).join(' ').toLowerCase();
+    let snippet = null;
+    let matched = hay.includes(term);
+    if (!matched) {
+      const msg = db.messages.filter((m) => m.conversationId === c.id).find((m) => (m.text || '').toLowerCase().includes(term));
+      if (msg) { matched = true; snippet = msg.text; }
+    }
+    if (matched) results.push({ conversation: c, snippet });
+  }
+  return results
+    .sort((a, b) => new Date(b.conversation.lastMessageAt) - new Date(a.conversation.lastMessageAt))
+    .slice(0, 50);
+}
+
 export function getThread(conversationId) {
   const conversation = db.conversations.get(conversationId);
   if (!conversation) return null;

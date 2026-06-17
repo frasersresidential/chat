@@ -32,6 +32,10 @@ export function buildReport(organizationId, { days = 7 } = {}) {
   const byChannel = {};
   for (const c of conversations) byChannel[c.channel] = (byChannel[c.channel] || 0) + 1;
 
+  // ── By lead grade (A–F) ──────────────────────────────────────────────────
+  const byGrade = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, ungraded: 0 };
+  for (const c of conversations) byGrade[c.grade || 'ungraded'] += 1;
+
   // ── First response time (inbound → first agent reply) ────────────────────
   const msgsByConv = new Map();
   for (const m of messages) {
@@ -85,5 +89,5 @@ export function buildReport(organizationId, { days = 7 } = {}) {
   const assignmentByType = {};
   for (const a of assignments) assignmentByType[a.assignmentType] = (assignmentByType[a.assignmentType] || 0) + 1;
 
-  return { totals, byChannel, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+  return { totals, byChannel, byGrade, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
 }
