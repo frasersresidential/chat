@@ -10,6 +10,8 @@ const state = {
   thread: null,
   notifications: [],
   ws: null,
+  pendingAttachments: [],
+  canned: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -36,6 +38,33 @@ async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json();
 }
 const can = (perm) => (state.meta?.permissions || []).includes(perm);
+
+// ── Attachments / media ───────────────────────────────────────────────────────
+function renderAttachments(atts) {
+  if (!atts || !atts.length) return '';
+  return `<div class="att-wrap">` + atts.map((a) => {
+    if (a.type === 'image') return `<a href="${esc(a.url)}" target="_blank"><img class="att-img" src="${esc(a.url)}" alt="${esc(a.name || '')}" /></a>`;
+    if (a.type === 'video') return `<video class="att-img" src="${esc(a.url)}" controls></video>`;
+    if (a.type === 'audio') return `<audio src="${esc(a.url)}" controls></audio>`;
+    return `<a class="att-file" href="${esc(a.url)}" target="_blank">📎 ${esc(a.name || 'file')}</a>`;
+  }).join('') + `</div>`;
+}
+
+// Upload a File via raw body (keeps the server dependency-free). Returns the
+// stored attachment descriptor { url, type, mime, name }.
+async function uploadFile(file) {
+  const res = await fetch('/api/uploads', {
+    method: 'POST',
+    headers: {
+      'content-type': file.type || 'application/octet-stream',
+      'x-file-name': encodeURIComponent(file.name || 'file'),
+      'x-user-id': state.user?.id || '',
+    },
+    body: file,
+  });
+  if (!res.ok) throw new Error('upload failed');
+  return res.json();
+}
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 async function boot() {
@@ -207,6 +236,7 @@ async function refreshInbox() {
 }
 
 async function openThread(id) {
+  if (id !== state.selectedId) state.pendingAttachments = [];
   state.selectedId = id;
   const data = await api('/conversations/' + id);
   state.thread = data;
@@ -242,26 +272,47 @@ function renderThread() {
     <div class="messages" id="messages">
       ${messages.map((m) => `
         <div class="msg ${m.direction}">
-          ${esc(m.text)}
+          ${m.text ? esc(m.text) : ''}
+          ${renderAttachments(m.attachments)}
           <div class="meta">${esc(m.senderName || '')} · ${timeAgo(m.createdAt)}</div>
         </div>`).join('')}
     </div>
+    <div id="attachPreview" class="attach-preview"></div>
+    <div id="quickPanel" class="quick-panel hidden"></div>
     <div class="composer">
-      <textarea id="replyInput" placeholder="${replyDisabled ? 'You do not have permission to reply' : 'Type a reply…'}" ${replyDisabled ? 'disabled' : ''}></textarea>
+      ${replyDisabled ? '' : `
+        <button class="btn ghost" id="attachBtn" title="แนบรูป/วิดีโอ/ไฟล์">📎</button>
+        <button class="btn ghost" id="quickBtn" title="คำตอบสำเร็จรูป">⚡</button>
+        <input type="file" id="fileInput" accept="image/*,video/*,application/pdf" multiple hidden />`}
+      <textarea id="replyInput" placeholder="${replyDisabled ? 'You do not have permission to reply' : 'พิมพ์ข้อความ…'}" ${replyDisabled ? 'disabled' : ''}></textarea>
       <button class="btn" id="sendBtn" ${replyDisabled ? 'disabled' : ''}>Send</button>
     </div>`;
   const msgs = $('#messages'); msgs.scrollTop = msgs.scrollHeight;
   if (!replyDisabled) {
+    renderAttachPreview();
     const send = async () => {
       const t = $('#replyInput').value.trim();
-      if (!t) return;
+      if (!t && !state.pendingAttachments.length) return;
       $('#replyInput').value = '';
-      try { await api('/conversations/' + c.id + '/reply', { method: 'POST', body: JSON.stringify({ text: t }) }); }
-      catch (e) { alert(e.message); }
+      const attachments = state.pendingAttachments;
+      state.pendingAttachments = [];
+      try { await api('/conversations/' + c.id + '/reply', { method: 'POST', body: JSON.stringify({ text: t, attachments }) }); }
+      catch (e) { alert(e.message); state.pendingAttachments = attachments; }
       openThread(c.id);
     };
     $('#sendBtn').onclick = send;
     $('#replyInput').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+    // Attach files
+    $('#attachBtn').onclick = () => $('#fileInput').click();
+    $('#fileInput').onchange = async (e) => {
+      for (const file of e.target.files) {
+        try { state.pendingAttachments.push(await uploadFile(file)); renderAttachPreview(); }
+        catch (err) { alert('อัปโหลดไม่สำเร็จ: ' + file.name); }
+      }
+      e.target.value = '';
+    };
+    // Quick replies
+    $('#quickBtn').onclick = () => toggleQuickPanel(c);
   }
   if ($('#takeoverBtn')) $('#takeoverBtn').onclick = async () => {
     await api('/conversations/' + c.id + '/takeover', { method: 'POST' }); openThread(c.id); refreshInbox();
@@ -273,6 +324,67 @@ function renderThread() {
   };
   if ($('#infoBtn')) $('#infoBtn').onclick = () => {
     document.querySelector('.inbox-layout')?.classList.toggle('mobile-detail');
+  };
+}
+
+function renderAttachPreview() {
+  const box = $('#attachPreview');
+  if (!box) return;
+  if (!state.pendingAttachments.length) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = state.pendingAttachments.map((a, i) => `
+    <span class="att-chip">
+      ${a.type === 'image' ? `<img src="${esc(a.url)}"/>` : a.type === 'video' ? '🎬' : '📎'}
+      <span class="att-name">${esc(a.name || a.type)}</span>
+      <button data-rm="${i}" title="ลบ">✕</button>
+    </span>`).join('');
+  box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
+    state.pendingAttachments.splice(+b.dataset.rm, 1); renderAttachPreview();
+  });
+}
+
+function toggleQuickPanel(c) {
+  const p = $('#quickPanel');
+  if (!p) return;
+  if (p.classList.contains('hidden')) openQuickPanel(c); else p.classList.add('hidden');
+}
+async function openQuickPanel(c) {
+  const panel = $('#quickPanel');
+  if (!panel) return;
+  if (!state.canned) { try { state.canned = await api('/canned-responses'); } catch { state.canned = []; } }
+  panel.innerHTML = `
+    <div class="qp-head">⚡ คำตอบสำเร็จรูป</div>
+    <div class="qp-list">${state.canned.length ? state.canned.map((q) => `
+      <div class="qp-item" data-ins="${q.id}">
+        <div class="qp-t">${esc(q.title)} ${q.shortcut ? `<span class="muted">${esc(q.shortcut)}</span>` : ''}
+          <button class="qp-del" data-del="${q.id}" title="ลบ">✕</button></div>
+        <div class="qp-b">${esc(q.text)}</div>
+      </div>`).join('') : '<div class="muted" style="padding:10px">ยังไม่มีคำตอบสำเร็จรูป เพิ่มได้ด้านล่าง</div>'}</div>
+    <div class="qp-add">
+      <input id="qpTitle" placeholder="หัวข้อ" />
+      <input id="qpText" placeholder="ข้อความสำเร็จรูป" />
+      <button class="btn" id="qpAdd">+ เพิ่ม</button>
+    </div>`;
+  panel.classList.remove('hidden');
+  panel.querySelectorAll('.qp-item').forEach((it) => it.onclick = (e) => {
+    if (e.target.closest('[data-del]')) return;
+    const q = state.canned.find((x) => x.id === it.dataset.ins);
+    const ta = $('#replyInput'); ta.value = (ta.value ? ta.value + ' ' : '') + q.text; ta.focus();
+    panel.classList.add('hidden');
+  });
+  panel.querySelectorAll('[data-del]').forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    try { await api('/canned-responses/' + b.dataset.del, { method: 'DELETE' }); } catch (err) { return alert(err.message); }
+    state.canned = state.canned.filter((x) => x.id !== b.dataset.del);
+    openQuickPanel(c);
+  });
+  $('#qpAdd').onclick = async () => {
+    const title = $('#qpTitle').value.trim(), text = $('#qpText').value.trim();
+    if (!title || !text) return;
+    try {
+      state.canned.push(await api('/canned-responses', { method: 'POST', body: JSON.stringify({ title, text }) }));
+      openQuickPanel(c);
+    } catch (err) { alert(err.message); }
   };
 }
 

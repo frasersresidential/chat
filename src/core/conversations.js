@@ -67,22 +67,25 @@ export function ingestInbound(account, inbound) {
 }
 
 /** Agent/manager sends an outbound reply through the originating channel. */
-export async function sendReply(conversationId, user, text) {
+export async function sendReply(conversationId, user, text, attachments = []) {
   const conversation = db.conversations.get(conversationId);
   if (!conversation) throw new Error('conversation not found');
+  if (!text && (!attachments || attachments.length === 0)) {
+    throw new Error('message text or an attachment is required');
+  }
 
   const account = db.channelAccounts.get(conversation.channelAccountId);
   const adapter = getAdapter(conversation.channel);
   if (!adapter) throw new Error(`no adapter for ${conversation.channel}`);
 
-  const externalMessageId = await adapter.send(account, conversation, text);
+  const externalMessageId = await adapter.send(account, conversation, text, attachments);
 
   const message = db.messages.insert({
     conversationId,
     direction: 'out',
     channel: conversation.channel,
     text,
-    attachments: [],
+    attachments: attachments || [],
     externalMessageId,
     senderUserId: user.id,
     senderName: user.name,

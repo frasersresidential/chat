@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../store/db.js';
@@ -15,6 +16,18 @@ import { logger } from '../logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = logger('api');
+
+// Where uploaded media (images/videos/files) is stored and served from.
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'data', 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const MIME_EXT = {
+  'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp',
+  'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+  'application/pdf': '.pdf', 'audio/mpeg': '.mp3', 'audio/ogg': '.ogg',
+};
+const mediaType = (mime) =>
+  mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'file';
 
 /** Resolve the acting user from the X-User-Id header (demo-grade auth). */
 function authMiddleware(req, res, next) {
@@ -38,6 +51,7 @@ export function createApp() {
 
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', '..', 'public')));
+  app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
 
   const api = express.Router();
   api.use(authMiddleware);
@@ -211,12 +225,49 @@ export function createApp() {
 
   api.post('/conversations/:id/reply', requirePerm(PERMISSIONS.REPLY), async (req, res) => {
     try {
-      const msg = await sendReply(req.params.id, req.user, String(req.body.text || '').trim());
+      const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
+      const msg = await sendReply(req.params.id, req.user, String(req.body.text || '').trim(), attachments);
       res.status(201).json(msg);
     } catch (e) {
       log.error(e.message);
       res.status(400).json({ error: e.message });
     }
+  });
+
+  // ── Media upload (images / video / files) ─────────────────────────────────
+  // Raw body upload — keeps the project dependency-free (no multer). The client
+  // sends the file bytes with its content-type and an X-File-Name header.
+  api.post('/uploads', requirePerm(PERMISSIONS.REPLY), express.raw({ type: '*/*', limit: '26214400' }), (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'empty upload' });
+    }
+    const mime = (req.header('content-type') || 'application/octet-stream').split(';')[0];
+    let origName = 'file';
+    try { origName = decodeURIComponent(req.header('x-file-name') || 'file'); } catch { /* keep default */ }
+    const ext = MIME_EXT[mime] || path.extname(origName) || '.bin';
+    const fileName = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, fileName), req.body);
+    res.status(201).json({ url: `/uploads/${fileName}`, type: mediaType(mime), mime, name: origName });
+  });
+
+  // ── Canned / quick replies ────────────────────────────────────────────────
+  api.get('/canned-responses', (req, res) => {
+    res.json(db.cannedResponses.filter((c) => c.organizationId === req.user.organizationId));
+  });
+  api.post('/canned-responses', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const title = String(req.body.title || '').trim();
+    const text = String(req.body.text || '').trim();
+    if (!title || !text) return res.status(400).json({ error: 'title and text required' });
+    res.status(201).json(db.cannedResponses.insert({
+      organizationId: req.user.organizationId, title, text,
+      shortcut: String(req.body.shortcut || '').trim(), createdBy: req.user.id,
+    }));
+  });
+  api.delete('/canned-responses/:id', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const c = db.cannedResponses.get(req.params.id);
+    if (!c || c.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    db.cannedResponses.remove(c.id);
+    res.status(204).end();
   });
 
   api.post('/conversations/:id/assign', requirePerm(PERMISSIONS.ASSIGN), (req, res) => {

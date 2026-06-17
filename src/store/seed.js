@@ -126,7 +126,17 @@ export function seedIfEmpty() {
   rule(db.channelAccounts.get('ca_mock'), seniorTeam.id, 'round_robin', 10, { type: 'vip' });
   rule(db.channelAccounts.get('ca_mock'), teamA.id, 'round_robin', 100, { type: 'always' });
 
+  // ── Canned / quick replies (shared across the org) ───────────────────────
+  const canned = (title, text, shortcut) =>
+    db.cannedResponses.insert({ organizationId: org.id, title, text, shortcut, createdBy: 'system' });
+  canned('ทักทาย', 'สวัสดีค่ะ ยินดีให้บริการค่ะ 😊 มีอะไรให้ช่วยดูแลไหมคะ', '/hi');
+  canned('ขอบคุณ', 'ขอบคุณมากค่ะ 🙏 หากมีคำถามเพิ่มเติมสอบถามได้เลยนะคะ', '/thx');
+  canned('รอสักครู่', 'รบกวนรอสักครู่นะคะ กำลังตรวจสอบข้อมูลให้ค่ะ', '/wait');
+  canned('ขอข้อมูลติดต่อ', 'รบกวนขอชื่อ-เบอร์โทร และที่อยู่สำหรับจัดส่งด้วยนะคะ', '/info');
+  canned('ชำระเงิน', 'ชำระผ่านบัญชีธนาคารหรือพร้อมเพย์ได้เลยค่ะ แจ้งสลิปหลังโอนได้เลยนะคะ', '/pay');
+
   log.info('seed complete: 1 org, ' + db.users.all().length + ' users, ' +
     db.channelAccounts.all().length + ' channel accounts, ' +
-    db.routingRules.all().length + ' routing rules');
+    db.routingRules.all().length + ' routing rules, ' +
+    db.cannedResponses.all().length + ' canned replies');
 }

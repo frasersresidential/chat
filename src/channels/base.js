@@ -48,14 +48,15 @@ export class BaseAdapter {
    * usable access token; otherwise we simulate so the whole platform runs with
    * zero credentials (the message is still stored & shown in the inbox).
    */
-  async send(account, conversation, text) {
+  async send(account, conversation, text, attachments = []) {
     const token = account?.credential?.accessToken;
+    const media = attachments.length ? ` [+${attachments.length} attachment(s)]` : '';
     if (!token) {
-      this.log.info(`[simulated send] ${this.type} → ${conversation.customer?.name}: ${text}`);
+      this.log.info(`[simulated send] ${this.type} → ${conversation.customer?.name}: ${text}${media}`);
       return `sim_${Date.now()}`;
     }
     try {
-      return await this.deliver(account, conversation, text);
+      return await this.deliver(account, conversation, text, attachments);
     } catch (err) {
       this.log.error(`delivery failed: ${err.message}`);
       throw err;
