@@ -14,10 +14,10 @@ services:
         generateValue: true        # Render generates a strong random secret
       - key: DEMO_PASSWORD
         sync: false                # set your own in the dashboard
-    # NOTE: a persistent disk is mounted at /app/data so the JSON store and
-    # uploads survive redeploys. (Free plans may restrict disks — remove this
-    # block and accept ephemeral data, or move to a database, if needed.)
-    disk:
-      name: omnichat-data
-      mountPath: /app/data
-      sizeGB: 1
+    # NOTE: the free plan has an EPHEMERAL filesystem — the JSON store + uploads
+    # reset on every redeploy/restart (data re-seeds fresh). To persist data,
+    # upgrade the instance and add a disk mounted at /app/data:
+    #   disk:
+    #     name: omnichat-data
+    #     mountPath: /app/data
+    #     sizeGB: 1
