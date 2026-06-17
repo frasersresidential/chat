@@ -215,6 +215,7 @@ function notifyInbound(message) {
 function render() {
   const main = $('#main');
   if (state.view === 'inbox') return renderInbox(main);
+  if (state.view === 'pipeline') return renderPipeline(main);
   if (state.view === 'channels') return renderChannels(main);
   if (state.view === 'teams') return renderTeams(main);
   if (state.view === 'users') return renderUsers(main);
@@ -342,6 +343,7 @@ function renderThread() {
         <div class="muted" style="font-size:12px">${esc(c.accountName)} · ${esc(c.channelLabel)}</div>
       </div>
       <div class="actions">
+        ${can('reply') ? `<button class="btn ghost" id="resolveBtn">${c.status === 'resolved' ? '↩ Reopen' : '✓ ปิดงาน'}</button>` : ''}
         ${can('takeover') ? `<button class="btn ghost" id="takeoverBtn">Take over</button>` : ''}
         ${can('transfer') || can('assign') ? `<button class="btn ghost" id="assignBtn">Assign / Transfer</button>` : ''}
         <button class="btn ghost mobile-only" id="infoBtn" title="ข้อมูลลูกค้า">ℹ️</button>
@@ -402,6 +404,12 @@ function renderThread() {
     await api('/conversations/' + c.id + '/takeover', { method: 'POST' }); openThread(c.id); refreshInbox();
   };
   if ($('#assignBtn')) $('#assignBtn').onclick = () => assignDialog(c);
+  if ($('#resolveBtn')) $('#resolveBtn').onclick = async () => {
+    const next = c.status === 'resolved' ? 'open' : 'resolved';
+    try { await api('/conversations/' + c.id + '/status', { method: 'POST', body: JSON.stringify({ status: next }) }); }
+    catch (e) { return alert(e.message); }
+    state.thread.conversation.status = next; renderThread(); refreshInbox();
+  };
   // Mobile navigation: back returns to the list, info toggles the detail sheet.
   if ($('#backBtn')) $('#backBtn').onclick = () => {
     document.querySelector('.inbox-layout')?.classList.remove('mobile-thread', 'mobile-detail');
@@ -529,6 +537,11 @@ function renderDetail() {
     <div class="row"><span class="muted">Account</span><span>${esc(c.accountName)}</span></div>
     <div class="row"><span class="muted">Owner</span><span>${esc(c.assignedUserName || '—')}</span></div>
 
+    <h4>Pipeline stage</h4>
+    <select id="stageSel" ${editable ? '' : 'disabled'}>
+      ${Object.entries(STAGE_LABEL).map(([k, v]) => `<option value="${k}" ${(c.stage || 'new') === k ? 'selected' : ''}>${v}</option>`).join('')}
+    </select>
+
     <h4>Grade (เกรดลูกค้า)</h4>
     <div class="grade-row">
       ${GRADES.map((g) => `<button class="grade-btn grade-${g} ${c.grade === g ? 'active' : ''}" data-grade="${g}" ${editable ? '' : 'disabled'}>${g}</button>`).join('')}
@@ -548,6 +561,12 @@ function renderDetail() {
     }).join('') : '<div class="muted">No assignments yet</div>'}`;
 
   if (!editable) return;
+  $('#stageSel').onchange = async () => {
+    try {
+      const updated = await api('/conversations/' + c.id + '/stage', { method: 'PUT', body: JSON.stringify({ stage: $('#stageSel').value }) });
+      state.thread.conversation = updated; refreshInbox();
+    } catch (e) { alert(e.message); }
+  };
   pane.querySelectorAll('[data-grade]').forEach((b) => b.onclick = async () => {
     try {
       const updated = await api('/conversations/' + c.id + '/grade', { method: 'PUT', body: JSON.stringify({ grade: b.dataset.grade }) });
@@ -565,6 +584,62 @@ function renderDetail() {
   if (ti) ti.onkeydown = (e) => {
     if (e.key === 'Enter' && ti.value.trim()) { e.preventDefault(); saveTags([...(c.tags || []), ti.value.trim()]); }
   };
+}
+
+// ── Sales pipeline (Kanban) ──────────────────────────────────────────────────────
+const STAGE_LABEL = { new: 'ทักเข้ามา', contacted: 'ติดต่อแล้ว', qualified: 'สนใจ/มีโอกาส', proposal: 'เสนอราคา/นัดดู', won: '✅ ปิดการขาย', lost: '✕ ไม่สำเร็จ' };
+async function renderPipeline(main) {
+  const { stages, conversations } = await api('/pipeline');
+  const meta = state.meta.channels || {};
+  const editable = can('reply');
+  const byStage = Object.fromEntries(stages.map((s) => [s, []]));
+  for (const c of conversations) (byStage[c.stage || 'new'] || byStage.new).push(c);
+
+  main.innerHTML = `<div class="pipeline">
+    ${stages.map((s) => `
+      <div class="kcol" data-stage="${s}">
+        <div class="kcol-head">${STAGE_LABEL[s] || s} <span class="kcount">${byStage[s].length}</span></div>
+        <div class="kcol-body" data-stage="${s}">
+          ${byStage[s].map((c) => {
+            const m = meta[c.channel] || {};
+            return `<div class="kcard" draggable="${editable}" data-id="${c.id}">
+              <div class="kcard-top">
+                <span class="kcard-name">${esc(c.customer?.name)}</span>
+                ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
+              </div>
+              <div class="kcard-sub">${m.icon || ''} ${esc(c.accountName || c.channelLabel)}</div>
+              <div class="kcard-meta">
+                ${c.customer?.vip ? '<span class="chip vip">★</span>' : ''}
+                ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
+                ${c.assignedUserName ? `<span class="chip owner">${esc(c.assignedUserName)}</span>` : '<span class="chip unassigned">—</span>'}
+                ${c.status === 'resolved' ? '<span class="chip">resolved</span>' : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('')}
+  </div>`;
+
+  // open conversation on click
+  main.querySelectorAll('.kcard').forEach((card) => {
+    card.onclick = () => { state.view = 'inbox'; state.selectedId = card.dataset.id; setActiveNav('inbox'); render(); };
+    if (editable) card.ondragstart = (e) => { e.dataTransfer.setData('text/id', card.dataset.id); card.classList.add('dragging'); };
+    if (editable) card.ondragend = () => card.classList.remove('dragging');
+  });
+  if (!editable) return;
+  main.querySelectorAll('.kcol-body').forEach((col) => {
+    col.ondragover = (e) => { e.preventDefault(); col.classList.add('drop'); };
+    col.ondragleave = () => col.classList.remove('drop');
+    col.ondrop = async (e) => {
+      e.preventDefault(); col.classList.remove('drop');
+      const id = e.dataTransfer.getData('text/id');
+      try { await api('/conversations/' + id + '/stage', { method: 'PUT', body: JSON.stringify({ stage: col.dataset.stage }) }); renderPipeline(main); }
+      catch (err) { alert(err.message); }
+    };
+  });
+}
+function setActiveNav(view) {
+  $('#nav').querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.view === view));
 }
 
 // ── Channels admin ─────────────────────────────────────────────────────────────
@@ -940,6 +1015,13 @@ async function renderReports(main) {
           ? Object.entries(r.assignmentByType).map(([k, v]) => bar(k, v, Math.max(1, ...Object.values(r.assignmentByType)), 'var(--orange)')).join('')
           : '<p class="muted">No assignments yet</p>'}
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Sales pipeline funnel</h3>
+      ${(() => { const s = r.byStage || {}; const max = Math.max(1, ...Object.values(s));
+        const lbl = { new: 'ทักเข้ามา', contacted: 'ติดต่อแล้ว', qualified: 'สนใจ/มีโอกาส', proposal: 'เสนอราคา/นัดดู', won: '✅ ปิดการขาย', lost: '✕ ไม่สำเร็จ' };
+        return ['new','contacted','qualified','proposal','won','lost'].map((k) => bar(lbl[k], s[k] || 0, max, k === 'won' ? 'var(--green)' : k === 'lost' ? 'var(--red)' : 'var(--accent)')).join(''); })()}
     </div>
   </div>`;
 }

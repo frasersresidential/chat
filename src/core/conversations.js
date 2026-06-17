@@ -160,6 +160,39 @@ export function searchConversations(user, q) {
     .slice(0, 50);
 }
 
+// ── Sales pipeline + resolve ─────────────────────────────────────────────────
+export const STAGES = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'];
+
+/** Move a conversation along the sales pipeline. */
+export function setStage(conversationId, stage) {
+  if (!STAGES.includes(stage)) throw new Error('invalid stage');
+  const updated = db.conversations.update(conversationId, { stage });
+  if (updated) bus.emit('conversation:upserted', updated);
+  return updated;
+}
+
+/** Resolve (close) or reopen a conversation. */
+export function setStatus(conversationId, status) {
+  if (!['open', 'resolved'].includes(status)) throw new Error('invalid status');
+  const updated = db.conversations.update(conversationId, {
+    status,
+    resolvedAt: status === 'resolved' ? new Date().toISOString() : null,
+  });
+  if (updated) bus.emit('conversation:upserted', updated);
+  return updated;
+}
+
+/** All conversations visible to the user (any status) for the Kanban board. */
+export function pipelineConversations(user) {
+  const canSeeAll = can(user, PERMISSIONS.VIEW_ALL_CONVERSATIONS);
+  const myTeams = new Set(teamsForUser(user.id));
+  const teamMemberIds = new Set(db.teamMembers.filter((m) => myTeams.has(m.teamId)).map((m) => m.userId));
+  return db.conversations
+    .filter((c) => c.organizationId === user.organizationId &&
+      (canSeeAll || c.assignedUserId === user.id || (c.assignedUserId && teamMemberIds.has(c.assignedUserId))))
+    .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
+}
+
 export function getThread(conversationId) {
   const conversation = db.conversations.get(conversationId);
   if (!conversation) return null;
@@ -181,7 +214,7 @@ export function getThread(conversationId) {
  */
 export function listInbox(user, mode = 'my') {
   const orgConvos = db.conversations
-    .filter((c) => c.organizationId === user.organizationId)
+    .filter((c) => c.organizationId === user.organizationId && c.status !== 'resolved')
     .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
 
   const canSeeAll =

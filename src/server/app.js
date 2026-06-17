@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { db } from '../store/db.js';
 import { can, PERMISSIONS, ROLES, isEligibleForAssignment } from '../core/rbac.js';
 import { setPresence } from '../core/presence.js';
-import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchConversations } from '../core/conversations.js';
+import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchConversations, setStage, setStatus, pipelineConversations, STAGES } from '../core/conversations.js';
 import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
@@ -335,6 +335,25 @@ export function createApp() {
     const results = searchConversations(req.user, req.query.q)
       .map((r) => ({ snippet: r.snippet, conversation: decorateConversation(r.conversation) }));
     res.json(results);
+  });
+
+  // ── Sales pipeline (Kanban) + resolve ─────────────────────────────────────
+  api.get('/pipeline', (req, res) => {
+    res.json({ stages: STAGES, conversations: pipelineConversations(req.user).map(decorateConversation) });
+  });
+
+  api.put('/conversations/:id/stage', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const conv = db.conversations.get(req.params.id);
+    if (!conv || conv.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    try { res.json(decorateConversation(setStage(conv.id, req.body.stage))); }
+    catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  api.post('/conversations/:id/status', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const conv = db.conversations.get(req.params.id);
+    if (!conv || conv.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    try { res.json(decorateConversation(setStatus(conv.id, req.body.status))); }
+    catch (e) { res.status(400).json({ error: e.message }); }
   });
 
   api.post('/conversations/:id/assign', requirePerm(PERMISSIONS.ASSIGN), (req, res) => {
