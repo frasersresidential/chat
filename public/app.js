@@ -148,6 +148,7 @@ function render() {
   if (state.view === 'teams') return renderTeams(main);
   if (state.view === 'users') return renderUsers(main);
   if (state.view === 'routing') return renderRouting(main);
+  if (state.view === 'reports') return renderReports(main);
   if (state.view === 'simulator') return renderSimulator(main);
 }
 
@@ -304,25 +305,86 @@ function renderDetail() {
 }
 
 // ── Channels admin ─────────────────────────────────────────────────────────────
+// Credential fields the connect/edit form exposes per channel type.
+const CRED_FIELDS = {
+  line: [['accessToken', 'Channel Access Token'], ['channelSecret', 'Channel Secret']],
+  messenger: [['accessToken', 'Page Access Token'], ['appSecret', 'App Secret'], ['verifyToken', 'Verify Token']],
+  instagram: [['accessToken', 'Page Access Token'], ['appSecret', 'App Secret'], ['verifyToken', 'Verify Token']],
+  whatsapp: [['accessToken', 'Access Token'], ['appSecret', 'App Secret'], ['verifyToken', 'Verify Token']],
+  tiktok: [['clientKey', 'Client Key'], ['clientSecret', 'Client Secret'], ['accessToken', 'Access Token']],
+  x: [['bearerToken', 'Bearer Token'], ['apiSecret', 'API Secret'], ['accessToken', 'Access Token']],
+  mock: [],
+};
+const webhookUrl = (type) => `${location.origin}/webhooks/${type}`;
+let editingChannelId = null;
+
 async function renderChannels(main) {
   const accounts = await api('/channel-accounts');
+  const manage = can('manage_channels');
   main.innerHTML = `<div class="admin">
-    <h2>Connected Channel Accounts</h2>
-    <p class="muted">One organization, many accounts per channel. Empty credentials run in simulated mode.</p>
+    <h2>Channel Accounts & Connections</h2>
+    <p class="muted">One organization, many accounts per channel. Empty credentials run in simulated mode. Point each platform's webhook to the URL shown below.</p>
     <div class="card">
-      <table><thead><tr><th>Channel</th><th>Account Name</th><th>External ID</th><th>Webhook</th><th>Status</th><th>Credentials</th></tr></thead>
-      <tbody>${accounts.map((a) => `
+      <table><thead><tr><th>Channel</th><th>Account</th><th>Webhook URL</th><th>Connection</th><th>Status</th>${manage ? '<th></th>' : ''}</tr></thead>
+      <tbody>${accounts.map((a) => {
+        const m = state.meta.channels[a.channelType] || {};
+        const configured = Object.values(a.credential).some(Boolean);
+        return `
         <tr>
-          <td>${(state.meta.channels[a.channelType]||{}).icon||''} ${esc((state.meta.channels[a.channelType]||{}).label||a.channelType)}</td>
-          <td>${esc(a.accountName)}</td><td class="muted">${esc(a.accountId)}</td>
-          <td><span class="pill">${esc(a.webhookStatus)}</span></td>
-          <td>${esc(a.status)}</td>
-          <td class="muted">${Object.values(a.credential).some(Boolean) ? 'configured' : 'simulated'}</td>
-        </tr>`).join('')}</tbody></table>
+          <td>${m.icon||''} ${esc(m.label||a.channelType)}</td>
+          <td>${esc(a.accountName)}<div class="muted" style="font-size:11px">${esc(a.accountId)}</div></td>
+          <td><code class="hookurl" data-url="${webhookUrl(a.channelType)}" title="Click to copy">${esc(webhookUrl(a.channelType))}</code></td>
+          <td><span class="pill ${configured ? 'role-agent' : ''}">${configured ? '● connected' : '○ simulated'}</span> <span class="muted" style="font-size:11px">${esc(a.webhookStatus)}</span></td>
+          <td><span class="dot ${a.status === 'active' ? 'online' : 'offline'}"></span>${esc(a.status)}</td>
+          ${manage ? `<td style="white-space:nowrap">
+            <button class="btn ghost" data-edit="${a.id}">Edit</button>
+            <button class="btn ghost" data-toggle="${a.id}" data-next="${a.status === 'active' ? 'inactive' : 'active'}">${a.status === 'active' ? 'Disable' : 'Enable'}</button>
+            <button class="btn ghost" data-del="${a.id}">✕</button>
+          </td>` : ''}
+        </tr>
+        ${manage && editingChannelId === a.id ? `<tr><td colspan="6">${channelEditForm(a)}</td></tr>` : ''}`;
+      }).join('')}</tbody></table>
     </div>
-    ${can('manage_channels') ? channelForm() : '<p class="muted">You need Manage Channels permission to add accounts.</p>'}
+    ${manage ? channelForm() : '<p class="muted">You need Manage Channels permission to add or edit accounts.</p>'}
   </div>`;
-  if (can('manage_channels')) wireChannelForm();
+
+  // copy webhook url on click
+  main.querySelectorAll('.hookurl').forEach((c) => c.onclick = () => {
+    navigator.clipboard?.writeText(c.dataset.url); c.textContent = '✓ copied'; setTimeout(() => c.textContent = c.dataset.url, 900);
+  });
+  if (!manage) return;
+  main.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => { editingChannelId = editingChannelId === b.dataset.edit ? null : b.dataset.edit; renderChannels(main); });
+  main.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => { await api('/channel-accounts/' + b.dataset.toggle, { method: 'PUT', body: JSON.stringify({ status: b.dataset.next }) }); renderChannels(main); });
+  main.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { if (confirm('Remove this channel account and its routing rules?')) { await api('/channel-accounts/' + b.dataset.del, { method: 'DELETE' }); editingChannelId = null; renderChannels(main); } });
+  if (editingChannelId) wireChannelEditForm(accounts.find((a) => a.id === editingChannelId), main);
+  wireChannelForm();
+}
+
+function channelEditForm(a) {
+  const fields = CRED_FIELDS[a.channelType] || [];
+  return `<div class="card" style="margin:8px 0">
+    <h3>Edit ${esc(a.accountName)}</h3>
+    <div class="form-grid">
+      <div><label>Account name</label><input id="ceName" value="${esc(a.accountName)}" /></div>
+      <div><label>External account id</label><input id="ceId" value="${esc(a.accountId)}" /></div>
+      ${fields.map(([k, lbl]) => `<div><label>${lbl}</label><input data-cred="${k}" placeholder="${a.credential[k] ? '•••• configured (leave blank to keep)' : 'not set'}" /></div>`).join('')}
+      <div><button class="btn" id="ceSave">Save</button></div>
+    </div>
+    <p class="muted" style="font-size:11px">Secrets are write-only — existing values are never shown. Leave a field blank to keep it.</p>
+  </div>`;
+}
+function wireChannelEditForm(a, main) {
+  $('#ceSave').onclick = async () => {
+    const credential = {};
+    main.querySelectorAll('[data-cred]').forEach((i) => { if (i.value.trim()) credential[i.dataset.cred] = i.value.trim(); });
+    try {
+      await api('/channel-accounts/' + a.id, { method: 'PUT', body: JSON.stringify({
+        accountName: $('#ceName').value, accountId: $('#ceId').value,
+        ...(Object.keys(credential).length ? { credential } : {}),
+      }) });
+      editingChannelId = null; renderChannels(main);
+    } catch (e) { alert(e.message); }
+  };
 }
 function channelForm() {
   return `<div class="card"><h3>Connect new account</h3>
@@ -330,7 +392,7 @@ function channelForm() {
       <div><label>Channel</label><select id="cfType">${state.meta.channelTypes.map((t) => `<option value="${t}">${(state.meta.channels[t]||{}).label||t}</option>`).join('')}</select></div>
       <div><label>Account name</label><input id="cfName" placeholder="LINE OA Brand C" /></div>
       <div><label>External account id</label><input id="cfId" placeholder="line_brand_c" /></div>
-      <div><label>Access token</label><input id="cfToken" placeholder="optional" /></div>
+      <div><label>Access token (optional)</label><input id="cfToken" placeholder="connect later via Edit" /></div>
       <div><button class="btn" id="cfAdd">Add account</button></div>
     </div></div>`;
 }
@@ -364,26 +426,58 @@ async function renderTeams(main) {
 async function renderUsers(main) {
   const users = await api('/users');
   state.users = users;
+  const manage = can('manage_users');
+  const roleOptions = (sel) => Object.entries(state.meta.roles).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v.label}</option>`).join('');
   main.innerHTML = `<div class="admin">
-    <h2>Users & Roles</h2>
+    <h2>Users, Access & Permissions</h2>
+    <p class="muted">Invite people, set their role (which decides their permissions) and revoke access. Disabled users keep their history but can't sign in or receive chats.</p>
     <div class="card"><table>
-      <thead><tr><th>Name</th><th>Role</th><th>Presence</th><th>Assignable</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Presence</th><th>Access</th><th>Assignable</th>${manage ? '<th></th>' : ''}</tr></thead>
       <tbody>${users.map((u) => {
         const role = state.meta.roles[u.role] || {};
-        return `<tr><td>${esc(u.name)}</td><td><span class="pill role-${u.role}">${esc(role.label || u.role)}</span></td>
-        <td><span class="dot ${u.presence}"></span>${u.presence}</td>
-        <td>${role.eligibleForAssignment ? '✅ round robin' : '— observer/manager'}</td></tr>`;
+        const status = u.status || 'active';
+        return `<tr>
+          <td>${esc(u.name)}</td>
+          <td class="muted">${esc(u.email || '—')}</td>
+          <td>${manage
+            ? `<select data-role-for="${u.id}">${roleOptions(u.role)}</select>`
+            : `<span class="pill role-${u.role}">${esc(role.label || u.role)}</span>`}</td>
+          <td><span class="dot ${u.presence}"></span>${u.presence}</td>
+          <td><span class="pill ${status === 'active' ? 'role-agent' : ''}">${status}</span></td>
+          <td>${role.eligibleForAssignment ? '✅ round robin' : '— observer/manager'}</td>
+          ${manage ? `<td style="white-space:nowrap">
+            <button class="btn ghost" data-status="${u.id}" data-next="${status === 'disabled' ? 'active' : 'disabled'}">${status === 'disabled' ? 'Enable' : 'Disable'}</button>
+          </td>` : ''}
+        </tr>`;
       }).join('')}</tbody></table></div>
-    ${can('manage_users') ? `<div class="card"><h3>Add user</h3><div class="form-grid">
+    ${manage ? `<div class="card"><h3>Invite user</h3>
+      <p class="muted" style="font-size:12px">Creates the account with status “invited”. (Demo build uses act-as switching instead of passwords.)</p>
+      <div class="form-grid">
       <div><label>Name</label><input id="uName" /></div>
-      <div><label>Email</label><input id="uEmail" /></div>
-      <div><label>Role</label><select id="uRole">${Object.entries(state.meta.roles).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
-      <div><button class="btn" id="uAdd">Add</button></div></div></div>` : ''}
+      <div><label>Email</label><input id="uEmail" placeholder="name@company.com" /></div>
+      <div><label>Role</label><select id="uRole">${roleOptions('agent')}</select></div>
+      <div><button class="btn" id="uAdd">Send invite</button></div></div>
+      <div class="muted" style="margin-top:10px;font-size:12px">${permissionLegend()}</div>
+    </div>` : ''}
   </div>`;
-  if (can('manage_users')) $('#uAdd').onclick = async () => {
+  if (!manage) return;
+  $('#uAdd').onclick = async () => {
     try { await api('/users', { method: 'POST', body: JSON.stringify({ name: $('#uName').value, email: $('#uEmail').value, role: $('#uRole').value }) }); renderUsers(main); }
     catch (e) { alert(e.message); }
   };
+  main.querySelectorAll('[data-role-for]').forEach((s) => s.onchange = async () => {
+    try { await api('/users/' + s.dataset.roleFor, { method: 'PUT', body: JSON.stringify({ role: s.value }) }); renderUsers(main); }
+    catch (e) { alert(e.message); }
+  });
+  main.querySelectorAll('[data-status]').forEach((b) => b.onclick = async () => {
+    try { await api('/users/' + b.dataset.status, { method: 'PUT', body: JSON.stringify({ status: b.dataset.next }) }); renderUsers(main); }
+    catch (e) { alert(e.message); }
+  });
+}
+
+function permissionLegend() {
+  return Object.entries(state.meta.roles).map(([, v]) =>
+    `<b>${esc(v.label)}</b>: ${v.eligibleForAssignment ? 'receives chats' : 'observer/manager'}`).join(' · ');
 }
 
 // ── Routing admin ────────────────────────────────────────────────────────────────
@@ -431,6 +525,73 @@ async function renderRouting(main) {
       } catch (e) { alert(e.message); }
     };
   }
+}
+
+// ── Reports / analytics ────────────────────────────────────────────────────────────
+async function renderReports(main) {
+  let r;
+  try { r = await api('/reports'); }
+  catch (e) { main.innerHTML = `<div class="admin"><h2>Reports</h2><p class="muted">You need View Analytics permission (Owner / Admin / Manager).</p></div>`; return; }
+
+  const t = r.totals;
+  const channelLabel = (k) => (state.meta.channels[k] || {}).label || k;
+  const channelIcon = (k) => (state.meta.channels[k] || {}).icon || '';
+  const maxCh = Math.max(1, ...Object.values(r.byChannel));
+  const maxDay = Math.max(1, ...r.volumeByDay.map((d) => d.count));
+  const maxAg = Math.max(1, ...r.byAgent.map((a) => a.assigned));
+
+  const stat = (label, value, sub = '') =>
+    `<div class="stat"><div class="stat-v">${value}</div><div class="stat-l">${label}</div>${sub ? `<div class="muted" style="font-size:11px">${sub}</div>` : ''}</div>`;
+  const bar = (label, value, max, color = 'var(--accent)') =>
+    `<div class="barrow"><span class="barlbl">${label}</span><span class="bartrack"><span class="barfill" style="width:${(value / max) * 100}%;background:${color}"></span></span><span class="barval">${value}</span></div>`;
+
+  main.innerHTML = `<div class="admin">
+    <h2>Reports & Analytics</h2>
+    <div class="stat-grid">
+      ${stat('Conversations', t.conversations)}
+      ${stat('Open', t.open)}
+      ${stat('Unassigned', t.unassigned)}
+      ${stat('Avg first response', r.avgFirstResponseMin != null ? r.avgFirstResponseMin + 'm' : '—', 'inbound → first reply')}
+      ${stat('VIP chats', t.vip)}
+      ${stat('Agents online', t.agentsOnline)}
+      ${stat('Active channels', t.activeChannels)}
+      ${stat('Messages', t.messages)}
+    </div>
+
+    <div class="report-cols">
+      <div class="card">
+        <h3>Conversations by channel</h3>
+        ${Object.keys(r.byChannel).length
+          ? Object.entries(r.byChannel).sort((a, b) => b[1] - a[1]).map(([k, v]) => bar(`${channelIcon(k)} ${channelLabel(k)}`, v, maxCh)).join('')
+          : '<p class="muted">No data yet</p>'}
+      </div>
+      <div class="card">
+        <h3>Daily volume (7 days)</h3>
+        ${r.volumeByDay.map((d) => bar(d.date.slice(5), d.count, maxDay, 'var(--green)')).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Agent performance</h3>
+      <table>
+        <thead><tr><th>Agent</th><th>Role</th><th>Presence</th><th>Assigned</th><th>Open</th><th>Replies</th><th>Load</th></tr></thead>
+        <tbody>${r.byAgent.length ? r.byAgent.map((a) => `<tr>
+          <td>${esc(a.name)}</td>
+          <td><span class="pill role-${a.role}">${esc((state.meta.roles[a.role] || {}).label || a.role)}</span></td>
+          <td><span class="dot ${a.presence}"></span>${a.presence}</td>
+          <td>${a.assigned}</td><td>${a.open}</td><td>${a.replies}</td>
+          <td><span class="bartrack" style="width:120px"><span class="barfill" style="width:${(a.assigned / maxAg) * 100}%"></span></span></td>
+        </tr>`).join('') : '<tr><td colspan="7" class="muted">No agents with conversations yet</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Assignment distribution</h3>
+      ${Object.keys(r.assignmentByType).length
+        ? Object.entries(r.assignmentByType).map(([k, v]) => bar(k, v, Math.max(1, ...Object.values(r.assignmentByType)), 'var(--orange)')).join('')
+        : '<p class="muted">No assignments yet</p>'}
+    </div>
+  </div>`;
 }
 
 // ── Simulator ────────────────────────────────────────────────────────────────────

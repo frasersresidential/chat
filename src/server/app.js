@@ -8,6 +8,7 @@ import { listInbox, getThread, sendReply, markRead } from '../core/conversations
 import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
+import { buildReport } from '../core/reports.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -66,9 +67,27 @@ export function createApp() {
     if (!name || !ROLES[role]) return res.status(400).json({ error: 'name and valid role required' });
     const user = db.users.insert({
       organizationId: req.user.organizationId,
-      name, email: email || '', role, presence: 'offline',
+      name, email: email || '', role, presence: 'offline', status: 'invited',
     });
     res.status(201).json(user);
+  });
+
+  // Edit a user's role / status / name (and revoke = status:disabled).
+  api.put('/users/:id', requirePerm(PERMISSIONS.MANAGE_USERS), (req, res) => {
+    const target = db.users.get(req.params.id);
+    if (!target || target.organizationId !== req.user.organizationId) {
+      return res.status(404).json({ error: 'not found' });
+    }
+    const patch = {};
+    if (req.body.name) patch.name = req.body.name;
+    if (req.body.role) {
+      if (!ROLES[req.body.role]) return res.status(400).json({ error: 'invalid role' });
+      patch.role = req.body.role;
+    }
+    if (req.body.status && ['active', 'invited', 'disabled'].includes(req.body.status)) {
+      patch.status = req.body.status;
+    }
+    res.json(db.users.update(target.id, patch));
   });
 
   api.put('/me/presence', (req, res) => {
@@ -129,6 +148,20 @@ export function createApp() {
     if (req.body.credential) patch.credential = { ...acc.credential, ...req.body.credential };
     const updated = db.channelAccounts.update(acc.id, patch);
     res.json({ ...updated, credential: redactCredential(updated.credential) });
+  });
+
+  api.delete('/channel-accounts/:id', requirePerm(PERMISSIONS.MANAGE_CHANNELS), (req, res) => {
+    const acc = db.channelAccounts.get(req.params.id);
+    if (!acc || acc.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    // Drop routing rules that reference this account so we don't orphan them.
+    db.routingRules.filter((r) => r.channelAccountId === acc.id).forEach((r) => db.routingRules.remove(r.id));
+    db.channelAccounts.remove(acc.id);
+    res.status(204).end();
+  });
+
+  // ── Reports / analytics ───────────────────────────────────────────────────
+  api.get('/reports', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    res.json(buildReport(req.user.organizationId));
   });
 
   // ── Routing rules ─────────────────────────────────────────────────────────

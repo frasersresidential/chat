@@ -130,6 +130,21 @@ th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: upp
 .form-grid label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
 .muted { color: var(--muted); }
 
+/* Reports: stat cards + CSS bar charts */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+.stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.stat-v { font-size: 26px; font-weight: 700; }
+.stat-l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.report-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.barrow { display: flex; align-items: center; gap: 10px; margin: 7px 0; font-size: 13px; }
+.barlbl { width: 150px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bartrack { flex: 1; height: 14px; background: var(--bg3); border-radius: 8px; overflow: hidden; display: inline-block; }
+.barfill { display: block; height: 100%; background: var(--accent); border-radius: 8px; transition: width .3s; }
+.barval { width: 36px; text-align: right; color: var(--muted); flex-shrink: 0; }
+code.hookurl { cursor: pointer; font-size: 11px; color: var(--accent); word-break: break-all; }
+.pill.role-agent { } /* connected/active reuse the green agent pill */
+@media (max-width: 820px) { .report-cols { grid-template-columns: 1fr; } .barlbl { width: 110px; } }
+
 /* Mobile-only controls hidden on desktop */
 .mobile-only { display: none; }
 

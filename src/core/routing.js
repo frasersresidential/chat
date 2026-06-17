@@ -52,14 +52,15 @@ export function findRule(channelAccountId, ctx) {
  * while overall rotation stays fair. Returns null if nobody is available.
  */
 function pickRoundRobin(teamId, roleFilter) {
+  const active = (u) => u.status !== 'disabled';
   const roster = teamRoster(teamId).filter((u) => {
     const targetRole = roleFilter || null;
     const eligible = targetRole ? u.role === targetRole : isEligibleForAssignment(u);
-    return eligible && isAvailable(u);
+    return eligible && active(u) && isAvailable(u);
   });
   // Need a stable full roster (incl. offline) for cursor stability:
   const fullRoster = teamRoster(teamId).filter((u) =>
-    (roleFilter ? u.role === roleFilter : isEligibleForAssignment(u)),
+    active(u) && (roleFilter ? u.role === roleFilter : isEligibleForAssignment(u)),
   );
   if (roster.length === 0) return null;
 
