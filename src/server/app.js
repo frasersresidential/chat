@@ -9,7 +9,7 @@ import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchCon
 import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
-import { buildReport } from '../core/reports.js';
+import { buildReport, exportConversationsCSV, exportAgentsCSV } from '../core/reports.js';
 import { broadcast, broadcastAudience } from '../core/automation.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
@@ -175,8 +175,21 @@ export function createApp() {
   });
 
   // ── Reports / analytics ───────────────────────────────────────────────────
+  const parseRange = (q) => (q.range && q.range !== 'all' ? Number(q.range) || null : null);
+
   api.get('/reports', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
-    res.json(buildReport(req.user.organizationId));
+    res.json(buildReport(req.user.organizationId, { rangeDays: parseRange(req.query) }));
+  });
+
+  api.get('/reports/export', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    const opts = { rangeDays: parseRange(req.query) };
+    const isAgents = req.query.type === 'agents';
+    const csv = isAgents
+      ? exportAgentsCSV(req.user.organizationId, opts)
+      : exportConversationsCSV(req.user.organizationId, opts);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="omnichat-${isAgents ? 'agents' : 'conversations'}.csv"`);
+    res.send(csv);
   });
 
   // ── Automation: auto-replies / chatbot ────────────────────────────────────

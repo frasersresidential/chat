@@ -6,6 +6,7 @@ const state = {
   view: 'inbox',
   inboxMode: 'my',
   searchQuery: '',
+  reportRange: 'all',
   conversations: [],
   selectedId: null,
   thread: null,
@@ -946,9 +947,18 @@ async function renderBroadcast(main) {
 }
 
 // ── Reports / analytics ────────────────────────────────────────────────────────────
+async function downloadCSV(type) {
+  const res = await fetch(`/api/reports/export?type=${type}&range=${state.reportRange}`, { headers: { 'x-user-id': state.user?.id || '' } });
+  if (!res.ok) return alert('export failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `omnichat-${type}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function renderReports(main) {
   let r;
-  try { r = await api('/reports'); }
+  try { r = await api('/reports?range=' + state.reportRange); }
   catch (e) { main.innerHTML = `<div class="admin"><h2>Reports</h2><p class="muted">You need View Analytics permission (Owner / Admin / Manager).</p></div>`; return; }
 
   const t = r.totals;
@@ -964,7 +974,19 @@ async function renderReports(main) {
     `<div class="barrow"><span class="barlbl">${label}</span><span class="bartrack"><span class="barfill" style="width:${(value / max) * 100}%;background:${color}"></span></span><span class="barval">${value}</span></div>`;
 
   main.innerHTML = `<div class="admin">
-    <h2>Reports & Analytics</h2>
+    <div class="report-toolbar">
+      <h2 style="margin:0">Reports & Analytics</h2>
+      <div class="report-actions">
+        <select id="rangeSel">
+          <option value="all">ทั้งหมด</option>
+          <option value="7">7 วันล่าสุด</option>
+          <option value="30">30 วันล่าสุด</option>
+          <option value="90">90 วันล่าสุด</option>
+        </select>
+        <button class="btn ghost" id="expConv">⬇️ Export แชต (CSV)</button>
+        <button class="btn ghost" id="expAgents">⬇️ Export agent (CSV)</button>
+      </div>
+    </div>
     <div class="stat-grid">
       ${stat('Conversations', t.conversations)}
       ${stat('Open', t.open)}
@@ -1024,6 +1046,10 @@ async function renderReports(main) {
         return ['new','contacted','qualified','proposal','won','lost'].map((k) => bar(lbl[k], s[k] || 0, max, k === 'won' ? 'var(--green)' : k === 'lost' ? 'var(--red)' : 'var(--accent)')).join(''); })()}
     </div>
   </div>`;
+  $('#rangeSel').value = state.reportRange;
+  $('#rangeSel').onchange = () => { state.reportRange = $('#rangeSel').value; renderReports(main); };
+  $('#expConv').onclick = () => downloadCSV('conversations');
+  $('#expAgents').onclick = () => downloadCSV('agents');
 }
 function gradeColor(g) {
   return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';

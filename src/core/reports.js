@@ -8,9 +8,12 @@ import { roleDef } from './rbac.js';
  * Returns conversation totals, per-channel and per-agent breakdowns, first
  * response time, daily volume (last 7 days) and assignment-type distribution.
  */
-export function buildReport(organizationId, { days = 7 } = {}) {
-  const conversations = db.conversations.filter((c) => c.organizationId === organizationId);
+export function buildReport(organizationId, { rangeDays = null } = {}) {
+  const from = rangeDays ? new Date(Date.now() - rangeDays * 86400000) : null;
+  const conversations = db.conversations.filter((c) =>
+    c.organizationId === organizationId && (!from || new Date(c.createdAt) >= from));
   const convIds = new Set(conversations.map((c) => c.id));
+  const days = Math.min(rangeDays || 7, 30);
   const messages = db.messages.filter((m) => convIds.has(m.conversationId));
   const assignments = db.assignments.filter((a) => convIds.has(a.conversationId));
   const users = db.users.filter((u) => u.organizationId === organizationId);
@@ -93,5 +96,43 @@ export function buildReport(organizationId, { days = 7 } = {}) {
   const assignmentByType = {};
   for (const a of assignments) assignmentByType[a.assignmentType] = (assignmentByType[a.assignmentType] || 0) + 1;
 
-  return { totals, byChannel, byGrade, byStage, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+const csvCell = (v) => {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const toCSV = (header, rows) =>
+  '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n'); // BOM for Excel/Thai
+
+/** Conversations export — one row per conversation. */
+export function exportConversationsCSV(organizationId, { rangeDays = null } = {}) {
+  const from = rangeDays ? new Date(Date.now() - rangeDays * 86400000) : null;
+  const rows = db.conversations
+    .filter((c) => c.organizationId === organizationId && (!from || new Date(c.createdAt) >= from))
+    .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
+    .map((c) => {
+      const owner = c.assignedUserId ? db.users.get(c.assignedUserId) : null;
+      const account = db.channelAccounts.get(c.channelAccountId);
+      return [
+        c.id, c.customer?.name, c.channel, account?.accountName || '', owner?.name || 'Unassigned',
+        c.grade || '', c.stage || 'new', c.status || 'open', c.customer?.vip ? 'VIP' : '',
+        (c.tags || []).join('|'), c.createdAt, c.lastMessageAt,
+      ];
+    });
+  return toCSV(
+    ['id', 'customer', 'channel', 'account', 'owner', 'grade', 'stage', 'status', 'vip', 'tags', 'created_at', 'last_message_at'],
+    rows,
+  );
+}
+
+/** Agent performance export — one row per agent. */
+export function exportAgentsCSV(organizationId, opts = {}) {
+  const { byAgent } = buildReport(organizationId, opts);
+  return toCSV(
+    ['agent', 'role', 'presence', 'assigned', 'open', 'replies'],
+    byAgent.map((a) => [a.name, a.role, a.presence, a.assigned, a.open, a.replies]),
+  );
 }
