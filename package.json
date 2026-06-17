@@ -1,0 +1,20 @@
+{
+  "name": "omnichat",
+  "version": "1.0.0",
+  "description": "Omni-Channel chat inbox — unify Facebook Messenger, Instagram, TikTok, Line OA and X (Twitter) conversations into a single agent inbox.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nanoid": "^5.0.7",
+    "ws": "^8.18.0"
+  }
+}

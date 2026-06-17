@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniChat — Omni-Channel Inbox</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">📨 <span>OmniChat</span></div>
+      <nav class="nav" id="nav">
+        <button data-view="inbox" class="active">Inbox</button>
+        <button data-view="channels">Channels</button>
+        <button data-view="teams">Teams</button>
+        <button data-view="users">Users</button>
+        <button data-view="routing">Routing</button>
+        <button data-view="simulator">Simulator</button>
+      </nav>
+      <div class="topbar-right">
+        <button id="notifBtn" class="icon-btn" title="Notifications">🔔<span id="notifCount" class="badge hidden">0</span></button>
+        <select id="presenceSel" title="My availability">
+          <option value="online">🟢 Online</option>
+          <option value="busy">🟠 Busy</option>
+          <option value="away">🟡 Away</option>
+          <option value="offline">⚪ Offline</option>
+        </select>
+        <select id="userSel" title="Act as user (demo auth)"></select>
+      </div>
+    </header>
+
+    <!-- Notifications dropdown -->
+    <div id="notifPanel" class="notif-panel hidden"></div>
+
+    <main id="main"></main>
+  </div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
