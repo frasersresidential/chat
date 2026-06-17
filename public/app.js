@@ -76,6 +76,7 @@ async function boot() {
   await loadContext();
   buildUserSelector();
   wireNav();
+  initSound();
   connectWs();
   render();
 }
@@ -138,6 +139,11 @@ function connectWs() {
     if (msg.type === 'conversation:upserted' || msg.type === 'message:created') {
       if (state.view === 'inbox') refreshInbox();
       if (msg.type === 'message:created' && msg.conversationId === state.selectedId) openThread(state.selectedId);
+      // Ping the agent on inbound messages they aren't already looking at.
+      if (msg.type === 'message:created' && msg.message?.direction === 'in' &&
+          (msg.conversationId !== state.selectedId || document.hidden)) {
+        notifyInbound(msg.message);
+      }
     } else if (msg.type === 'typing') {
       if (msg.conversationId === state.selectedId && msg.user.id !== state.user.id && msg.isTyping) showTyping(msg.user.name);
     } else if (msg.type === 'notification:created') {
@@ -172,6 +178,39 @@ async function refreshNotifications() {
   });
 }
 
+// ── Sound & desktop notifications ─────────────────────────────────────────────
+let soundEnabled = localStorage.getItem('omnichat_sound') === '1';
+function initSound() {
+  updateSoundBtn();
+  $('#soundBtn').onclick = async () => {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem('omnichat_sound', soundEnabled ? '1' : '0');
+    if (soundEnabled && 'Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch { /* ignore */ }
+    }
+    updateSoundBtn();
+  };
+}
+function updateSoundBtn() { const b = $('#soundBtn'); if (b) b.textContent = soundEnabled ? '🔊' : '🔕'; }
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.07;
+    o.start(); o.stop(ctx.currentTime + 0.15);
+    o.onended = () => ctx.close();
+  } catch { /* autoplay blocked until user interacts */ }
+}
+function notifyInbound(message) {
+  if (!soundEnabled) return;
+  beep();
+  if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+    try { new Notification(message.senderName || 'ข้อความใหม่', { body: message.text || '(ไฟล์แนบ)', icon: '/icons/icon-192.png' }); }
+    catch { /* ignore */ }
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 function render() {
   const main = $('#main');
@@ -180,6 +219,8 @@ function render() {
   if (state.view === 'teams') return renderTeams(main);
   if (state.view === 'users') return renderUsers(main);
   if (state.view === 'routing') return renderRouting(main);
+  if (state.view === 'automation') return renderAutomation(main);
+  if (state.view === 'broadcast') return renderBroadcast(main);
   if (state.view === 'reports') return renderReports(main);
   if (state.view === 'simulator') return renderSimulator(main);
 }
@@ -747,6 +788,86 @@ async function renderRouting(main) {
       } catch (e) { alert(e.message); }
     };
   }
+}
+
+// ── Automation / chatbot ─────────────────────────────────────────────────────────
+async function renderAutomation(main) {
+  const rules = await api('/auto-replies');
+  const manage = can('manage_automation');
+  const TYPE_LABEL = { welcome: '👋 ข้อความต้อนรับ (แชตใหม่)', away: '🌙 ตอบนอกเวลา (ไม่มี agent online)', keyword: '🔑 ตอบตามคีย์เวิร์ด' };
+  main.innerHTML = `<div class="admin">
+    <h2>Automation / Chatbot</h2>
+    <p class="muted">ตอบลูกค้าอัตโนมัติ: ข้อความต้อนรับเมื่อมีแชตใหม่, ตอบเมื่อไม่มี agent ออนไลน์, และตอบ FAQ ตามคีย์เวิร์ด</p>
+    <div class="card"><table>
+      <thead><tr><th>ประเภท</th><th>คีย์เวิร์ด</th><th>ข้อความ</th><th>สถานะ</th>${manage ? '<th></th>' : ''}</tr></thead>
+      <tbody>${rules.length ? rules.map((r) => `<tr>
+        <td>${TYPE_LABEL[r.type] || r.type}</td>
+        <td>${(r.keywords || []).map((k) => `<span class="chip">${esc(k)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+        <td>${esc(r.text)}</td>
+        <td><span class="pill ${r.enabled ? 'role-agent' : ''}">${r.enabled ? 'on' : 'off'}</span></td>
+        ${manage ? `<td style="white-space:nowrap">
+          <button class="btn ghost" data-toggle="${r.id}" data-next="${r.enabled ? 'false' : 'true'}">${r.enabled ? 'ปิด' : 'เปิด'}</button>
+          <button class="btn ghost" data-del="${r.id}">✕</button></td>` : ''}
+      </tr>`).join('') : `<tr><td colspan="${manage ? 5 : 4}" class="muted">ยังไม่มีกฎ</td></tr>`}</tbody>
+    </table></div>
+    ${manage ? `<div class="card"><h3>เพิ่มกฎตอบอัตโนมัติ</h3><div class="form-grid">
+      <div><label>ประเภท</label><select id="arType"><option value="welcome">ข้อความต้อนรับ</option><option value="away">ตอบนอกเวลา</option><option value="keyword">ตอบตามคีย์เวิร์ด</option></select></div>
+      <div><label>คีย์เวิร์ด (คั่นด้วย , — เฉพาะแบบคีย์เวิร์ด)</label><input id="arKw" placeholder="ราคา, โปรโมชั่น" /></div>
+      <div style="grid-column:1/-1"><label>ข้อความตอบกลับ</label><input id="arText" placeholder="สวัสดีค่ะ ยินดีให้บริการ…" /></div>
+      <div><button class="btn" id="arAdd">เพิ่มกฎ</button></div>
+    </div></div>` : '<p class="muted">ต้องมีสิทธิ์ Manage Automation</p>'}
+  </div>`;
+  if (!manage) return;
+  main.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => { await api('/auto-replies/' + b.dataset.toggle, { method: 'PUT', body: JSON.stringify({ enabled: b.dataset.next === 'true' }) }); renderAutomation(main); });
+  main.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { await api('/auto-replies/' + b.dataset.del, { method: 'DELETE' }); renderAutomation(main); });
+  $('#arAdd').onclick = async () => {
+    try {
+      await api('/auto-replies', { method: 'POST', body: JSON.stringify({
+        type: $('#arType').value, text: $('#arText').value,
+        keywords: $('#arKw').value.split(',').map((s) => s.trim()).filter(Boolean),
+      }) });
+      renderAutomation(main);
+    } catch (e) { alert(e.message); }
+  };
+}
+
+// ── Broadcast ────────────────────────────────────────────────────────────────────
+async function renderBroadcast(main) {
+  if (!can('manage_automation')) { main.innerHTML = `<div class="admin"><h2>Broadcast</h2><p class="muted">ต้องมีสิทธิ์ Manage Automation</p></div>`; return; }
+  const accounts = await api('/channel-accounts');
+  main.innerHTML = `<div class="admin">
+    <h2>Broadcast — ยิงข้อความหาลูกค้า</h2>
+    <p class="muted">ส่งข้อความหาลูกค้าหลายคนพร้อมกัน กรองตามช่องทาง/เกรด/แท็ก แล้วดูจำนวนผู้รับก่อนส่ง</p>
+    <div class="card"><div class="form-grid">
+      <div><label>ช่องทาง</label><select id="bChannel"><option value="">ทุกช่องทาง</option>${state.meta.channelTypes.map((t) => `<option value="${t}">${(state.meta.channels[t] || {}).label || t}</option>`).join('')}</select></div>
+      <div><label>เกรด</label><select id="bGrade"><option value="">ทุกเกรด</option>${['A','B','C','D','E','F'].map((g) => `<option value="${g}">เกรด ${g}</option>`).join('')}</select></div>
+      <div><label>แท็ก (ตรงทั้งคำ)</label><input id="bTag" placeholder="เช่น สนใจคอนโด" /></div>
+      <div style="grid-column:1/-1"><label>ข้อความ</label><input id="bText" placeholder="📢 โปรโมชั่นพิเศษเดือนนี้…" /></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+      <button class="btn ghost" id="bPreview">ดูจำนวนผู้รับ</button>
+      <span id="bCount" class="muted"></span>
+      <button class="btn" id="bSend">ส่ง Broadcast</button>
+    </div>
+    <div id="bResult" class="muted" style="margin-top:10px"></div></div>
+  </div>`;
+  const filter = () => ({ channel: $('#bChannel').value || undefined, grade: $('#bGrade').value || undefined, tag: $('#bTag').value.trim() || undefined });
+  const qs = (f) => Object.entries(f).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  $('#bPreview').onclick = async () => {
+    const { count } = await api('/broadcast/audience?' + qs(filter()));
+    $('#bCount').textContent = `→ จะส่งถึง ${count} แชต`;
+  };
+  $('#bSend').onclick = async () => {
+    const text = $('#bText').value.trim();
+    if (!text) return alert('ใส่ข้อความก่อนค่ะ');
+    const { count } = await api('/broadcast/audience?' + qs(filter()));
+    if (!count) return alert('ไม่มีผู้รับตามเงื่อนไขนี้');
+    if (!confirm(`ยืนยันส่งถึง ${count} แชต?`)) return;
+    try {
+      const r = await api('/broadcast', { method: 'POST', body: JSON.stringify({ text, filter: filter() }) });
+      $('#bResult').textContent = `✓ ส่งสำเร็จ ${r.sent} แชต`;
+    } catch (e) { $('#bResult').textContent = '✕ ' + e.message; }
+  };
 }
 
 // ── Reports / analytics ────────────────────────────────────────────────────────────

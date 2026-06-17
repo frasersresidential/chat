@@ -4,6 +4,7 @@ import { getAdapter } from '../channels/registry.js';
 import { routeConversation, assignmentHistory } from './routing.js';
 import { can, PERMISSIONS } from './rbac.js';
 import { teamsForUser } from './teams.js';
+import { runAutoReplies } from './automation.js';
 import { logger } from '../logger.js';
 
 const log = logger('conversations');
@@ -63,6 +64,9 @@ export function ingestInbound(account, inbound) {
 
   bus.emit('conversation:upserted', conversation);
   bus.emit('message:created', { conversation, message });
+
+  // Fire auto-replies asynchronously so ingestion stays fast.
+  runAutoReplies({ account, conversation, text: inbound.text, isNew });
   return { conversation, message };
 }
 

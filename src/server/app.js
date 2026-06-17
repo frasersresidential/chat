@@ -10,6 +10,7 @@ import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
 import { buildReport } from '../core/reports.js';
+import { broadcast, broadcastAudience } from '../core/automation.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -176,6 +177,50 @@ export function createApp() {
   // ── Reports / analytics ───────────────────────────────────────────────────
   api.get('/reports', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
     res.json(buildReport(req.user.organizationId));
+  });
+
+  // ── Automation: auto-replies / chatbot ────────────────────────────────────
+  api.get('/auto-replies', (req, res) => {
+    res.json(db.autoReplies.filter((r) => r.organizationId === req.user.organizationId));
+  });
+  api.post('/auto-replies', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const { type, text, keywords, channelAccountId } = req.body;
+    if (!['welcome', 'keyword', 'away'].includes(type) || !String(text || '').trim()) {
+      return res.status(400).json({ error: 'valid type and text required' });
+    }
+    res.status(201).json(db.autoReplies.insert({
+      organizationId: req.user.organizationId,
+      type, text: String(text).trim(),
+      keywords: Array.isArray(keywords) ? keywords : [],
+      channelAccountId: channelAccountId || null,
+      enabled: true,
+    }));
+  });
+  api.put('/auto-replies/:id', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const r = db.autoReplies.get(req.params.id);
+    if (!r || r.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    const patch = {};
+    for (const k of ['text', 'enabled', 'channelAccountId']) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    if (Array.isArray(req.body.keywords)) patch.keywords = req.body.keywords;
+    res.json(db.autoReplies.update(r.id, patch));
+  });
+  api.delete('/auto-replies/:id', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    db.autoReplies.remove(req.params.id);
+    res.status(204).end();
+  });
+
+  // ── Broadcast ─────────────────────────────────────────────────────────────
+  api.get('/broadcast/audience', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    res.json({ count: broadcastAudience(req.user.organizationId, req.query) });
+  });
+  api.post('/broadcast', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), async (req, res) => {
+    const text = String(req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'text required' });
+    try {
+      res.json(await broadcast(req.user, text, req.body.filter || {}));
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // ── Routing rules ─────────────────────────────────────────────────────────

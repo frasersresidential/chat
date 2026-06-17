@@ -135,8 +135,16 @@ export function seedIfEmpty() {
   canned('ขอข้อมูลติดต่อ', 'รบกวนขอชื่อ-เบอร์โทร และที่อยู่สำหรับจัดส่งด้วยนะคะ', '/info');
   canned('ชำระเงิน', 'ชำระผ่านบัญชีธนาคารหรือพร้อมเพย์ได้เลยค่ะ แจ้งสลิปหลังโอนได้เลยนะคะ', '/pay');
 
+  // ── Auto-replies / chatbot ───────────────────────────────────────────────
+  const auto = (type, text, keywords = []) =>
+    db.autoReplies.insert({ organizationId: org.id, type, text, keywords, channelAccountId: null, enabled: true });
+  auto('welcome', 'สวัสดีค่ะ ขอบคุณที่ติดต่อเข้ามานะคะ 🙏 ทีมงานกำลังรีบมาดูแลค่ะ');
+  auto('away', 'ขณะนี้อยู่นอกเวลาทำการค่ะ ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุดนะคะ 😊');
+  auto('keyword', 'ราคาเริ่มต้นที่ 2.5 ล้านบาทค่ะ สนใจห้องแบบไหนดีคะ เดี๋ยวทีมขายส่งรายละเอียดให้นะคะ', ['ราคา', 'เท่าไหร่', 'price']);
+
   log.info('seed complete: 1 org, ' + db.users.all().length + ' users, ' +
     db.channelAccounts.all().length + ' channel accounts, ' +
     db.routingRules.all().length + ' routing rules, ' +
-    db.cannedResponses.all().length + ' canned replies');
+    db.cannedResponses.all().length + ' canned replies, ' +
+    db.autoReplies.all().length + ' auto-replies');
 }
