@@ -343,6 +343,7 @@ async function refreshInbox() {
         <div class="conv-preview">${esc(c.accountName || c.channelLabel)}</div>
         <div class="conv-meta">
           ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
+          ${c.adReferral ? '<span class="chip ads">📣 Ads</span>' : ''}
           ${c.customer?.vip ? '<span class="chip vip">★ VIP</span>' : ''}
           ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
           ${c.assignedUserName ? `<span class="chip owner">${esc(c.assignedUserName)}</span>` : '<span class="chip unassigned">Unassigned</span>'}
@@ -577,6 +578,13 @@ function renderDetail() {
     <div class="row"><span class="muted">Account</span><span>${esc(c.accountName)}</span></div>
     <div class="row"><span class="muted">Owner</span><span>${esc(c.assignedUserName || '—')}</span></div>
 
+    ${c.adReferral ? `
+    <h4>📣 มาจาก Facebook Ads</h4>
+    <div class="row"><span class="muted">Ad name</span><span>${esc(c.adReferral.adName || c.adReferral.adTitle || '—')}</span></div>
+    <div class="row"><span class="muted">Ad set</span><span>${esc(c.adReferral.adsetName || '—')}</span></div>
+    <div class="row"><span class="muted">Campaign</span><span>${esc(c.adReferral.campaignName || '—')}</span></div>
+    ${c.adReferral.ref ? `<div class="row"><span class="muted">Ref</span><span>${esc(c.adReferral.ref)}</span></div>` : ''}` : ''}
+
     <h4>Pipeline stage</h4>
     <select id="stageSel" ${editable ? '' : 'disabled'}>
       ${Object.entries(STAGE_LABEL).map(([k, v]) => `<option value="${k}" ${(c.stage || 'new') === k ? 'selected' : ''}>${v}</option>`).join('')}
@@ -649,6 +657,7 @@ async function renderPipeline(main) {
               </div>
               <div class="kcard-sub">${m.icon || ''} ${esc(c.accountName || c.channelLabel)}</div>
               <div class="kcard-meta">
+                ${c.adReferral ? '<span class="chip ads">📣</span>' : ''}
                 ${c.customer?.vip ? '<span class="chip vip">★</span>' : ''}
                 ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
                 ${c.assignedUserName ? `<span class="chip owner">${esc(c.assignedUserName)}</span>` : '<span class="chip unassigned">—</span>'}
@@ -1084,6 +1093,21 @@ async function renderReports(main) {
         const lbl = { new: 'ทักเข้ามา', contacted: 'ติดต่อแล้ว', qualified: 'สนใจ/มีโอกาส', proposal: 'เสนอราคา/นัดดู', won: '✅ ปิดการขาย', lost: '✕ ไม่สำเร็จ' };
         return ['new','contacted','qualified','proposal','won','lost'].map((k) => bar(lbl[k], s[k] || 0, max, k === 'won' ? 'var(--green)' : k === 'lost' ? 'var(--red)' : 'var(--accent)')).join(''); })()}
     </div>
+
+    <div class="report-cols">
+      <div class="card">
+        <h3>📣 แชตจาก Facebook Ads — แยกตาม Ad set</h3>
+        ${(() => { const a = r.byAdSet || {}; const ks = Object.keys(a); if (!ks.length) return `<p class="muted">ยังไม่มีแชตจากโฆษณา (${r.totals.fromAds || 0})</p>`;
+          const max = Math.max(1, ...Object.values(a));
+          return Object.entries(a).sort((x, y) => y[1] - x[1]).map(([k, v]) => bar(k, v, max, '#7c5cff')).join(''); })()}
+      </div>
+      <div class="card">
+        <h3>📣 แชตจาก Facebook Ads — แยกตาม Ad</h3>
+        ${(() => { const a = r.byAd || {}; const ks = Object.keys(a); if (!ks.length) return '<p class="muted">—</p>';
+          const max = Math.max(1, ...Object.values(a));
+          return Object.entries(a).sort((x, y) => y[1] - x[1]).map(([k, v]) => bar(k, v, max, '#7c5cff')).join(''); })()}
+      </div>
+    </div>
   </div>`;
   $('#rangeSel').value = state.reportRange;
   $('#rangeSel').onchange = () => { state.reportRange = $('#rangeSel').value; renderReports(main); };
@@ -1106,12 +1130,14 @@ async function renderSimulator(main) {
       <div><label>Customer id</label><input id="sId" value="cust_${Math.floor(Math.random()*9999)}" /></div>
       <div><label>VIP?</label><select id="sVip"><option value="">No</option><option value="1">Yes (VIP)</option></select></div>
       <div style="grid-column:1/-1"><label>Message</label><input id="sText" value="สวัสดีครับ สนใจสินค้า" /></div>
+      <div><label>Ad name (จำลอง CTM ads — Messenger)</label><input id="sAdName" placeholder="เว้นว่าง = ไม่ใช่จากโฆษณา" /></div>
+      <div><label>Ad set name</label><input id="sAdSet" placeholder="เช่น คนสนใจคอนโด-กรุงเทพ" /></div>
       <div><button class="btn" id="sSend">Send inbound</button></div>
     </div><div id="simResult" class="muted" style="margin-top:10px"></div></div>
   </div>`;
   $('#sSend').onclick = async () => {
     const [channel, accountId] = $('#sAcc').value.split('|');
-    const body = { accountId, participantId: $('#sId').value, participantName: $('#sName').value, text: $('#sText').value, vip: !!$('#sVip').value };
+    const body = { accountId, participantId: $('#sId').value, participantName: $('#sName').value, text: $('#sText').value, vip: !!$('#sVip').value, adName: $('#sAdName').value.trim(), adsetName: $('#sAdSet').value.trim() };
     const res = await fetch('/webhooks/' + channel, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(buildWebhookPayload(channel, body)) });
     $('#simResult').textContent = res.ok ? '✓ Sent — check the Inbox (switch user to the assigned agent if needed).' : '✕ Failed: ' + res.status;
   };
@@ -1120,7 +1146,14 @@ async function renderSimulator(main) {
 function buildWebhookPayload(channel, b) {
   if (channel === 'mock') return b;
   if (channel === 'line') return { destination: b.accountId, events: [{ type: 'message', message: { type: 'text', id: 'm' + Date.now(), text: b.text }, source: { userId: b.participantId } }] };
-  if (channel === 'messenger' || channel === 'instagram') return { entry: [{ id: b.accountId, messaging: [{ sender: { id: b.participantId, name: b.participantName }, message: { mid: 'm' + Date.now(), text: b.text } }] }] };
+  if (channel === 'messenger' || channel === 'instagram') {
+    const msg = { sender: { id: b.participantId, name: b.participantName }, message: { mid: 'm' + Date.now(), text: b.text } };
+    if (b.adName || b.adsetName) {
+      msg.referral = { source: 'ADS', type: 'OPEN_THREAD', ad_id: 'sim_' + Date.now(),
+        ads_context_data: { ad_title: b.adName, ad_name: b.adName, adset_name: b.adsetName } };
+    }
+    return { entry: [{ id: b.accountId, messaging: [msg] }] };
+  }
   if (channel === 'whatsapp') return { entry: [{ changes: [{ value: { metadata: { phone_number_id: b.accountId }, contacts: [{ wa_id: b.participantId, profile: { name: b.participantName } }], messages: [{ from: b.participantId, id: 'm' + Date.now(), text: { body: b.text }, timestamp: String(Math.floor(Date.now()/1000)) }] } }] }] };
   return b;
 }

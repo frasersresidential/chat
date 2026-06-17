@@ -43,6 +43,21 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   const byStage = { new: 0, contacted: 0, qualified: 0, proposal: 0, won: 0, lost: 0 };
   for (const c of conversations) byStage[c.stage || 'new'] = (byStage[c.stage || 'new'] || 0) + 1;
 
+  // ── Facebook Ads attribution (chats started from a Click-to-Messenger ad) ─
+  const byAdSet = {};
+  const byAd = {};
+  let fromAds = 0;
+  for (const c of conversations) {
+    const r = c.adReferral;
+    if (!r) continue;
+    fromAds += 1;
+    const adset = r.adsetName || 'ไม่ทราบ Ad set';
+    const ad = r.adName || r.adTitle || 'ไม่ทราบ Ad';
+    byAdSet[adset] = (byAdSet[adset] || 0) + 1;
+    byAd[ad] = (byAd[ad] || 0) + 1;
+  }
+  totals.fromAds = fromAds;
+
   // ── First response time (inbound → first agent reply) ────────────────────
   const msgsByConv = new Map();
   for (const m of messages) {
@@ -96,7 +111,7 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   const assignmentByType = {};
   for (const a of assignments) assignmentByType[a.assignmentType] = (assignmentByType[a.assignmentType] || 0) + 1;
 
-  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, byAdSet, byAd, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -116,14 +131,18 @@ export function exportConversationsCSV(organizationId, { rangeDays = null } = {}
     .map((c) => {
       const owner = c.assignedUserId ? db.users.get(c.assignedUserId) : null;
       const account = db.channelAccounts.get(c.channelAccountId);
+      const r = c.adReferral || {};
       return [
         c.id, c.customer?.name, c.channel, account?.accountName || '', owner?.name || 'Unassigned',
         c.grade || '', c.stage || 'new', c.status || 'open', c.customer?.vip ? 'VIP' : '',
-        (c.tags || []).join('|'), c.createdAt, c.lastMessageAt,
+        (c.tags || []).join('|'),
+        r.adName || r.adTitle || '', r.adsetName || '', r.campaignName || '', r.ref || '',
+        c.createdAt, c.lastMessageAt,
       ];
     });
   return toCSV(
-    ['id', 'customer', 'channel', 'account', 'owner', 'grade', 'stage', 'status', 'vip', 'tags', 'created_at', 'last_message_at'],
+    ['id', 'customer', 'channel', 'account', 'owner', 'grade', 'stage', 'status', 'vip', 'tags',
+      'ad_name', 'ad_set_name', 'campaign_name', 'ad_ref', 'created_at', 'last_message_at'],
     rows,
   );
 }

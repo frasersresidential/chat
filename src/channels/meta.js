@@ -2,6 +2,27 @@ import crypto from 'node:crypto';
 import { BaseAdapter } from './base.js';
 
 /**
+ * Normalize a Messenger `referral` object (present on Click-to-Messenger ads
+ * and m.me links). Real ads only give us `ad_id` + `ads_context_data`; the Ad
+ * name / Ad set name are resolved later via the Graph API (see core/ads.js).
+ * `ad_name`/`adset_name` are accepted too so the simulator can inject them.
+ */
+function parseReferral(r) {
+  if (!r || (r.source !== 'ADS' && !r.ad_id && !r.ref)) return null;
+  const ctx = r.ads_context_data || {};
+  return {
+    source: r.source || null,
+    type: r.type || null,
+    ref: r.ref || null,
+    adId: r.ad_id || null,
+    adTitle: ctx.ad_title || null,
+    adName: r.ad_name || ctx.ad_name || null,
+    adsetName: r.adset_name || ctx.adset_name || null,
+    campaignName: r.campaign_name || ctx.campaign_name || null,
+  };
+}
+
+/**
  * Shared base for Meta's Messenger Platform family (Facebook Messenger,
  * Instagram Messaging, WhatsApp Cloud API). They share webhook verification
  * (hub challenge + X-Hub-Signature-256) and Graph API delivery.
@@ -45,6 +66,7 @@ export class MetaAdapter extends BaseAdapter {
           text: ev.message.text || '',
           attachments: ev.message.attachments || [],
           externalMessageId: ev.message.mid,
+          referral: parseReferral(ev.referral || ev.message?.referral || ev.postback?.referral),
           timestamp: ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString(),
         });
       }

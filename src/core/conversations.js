@@ -5,6 +5,7 @@ import { routeConversation, assignmentHistory } from './routing.js';
 import { can, PERMISSIONS } from './rbac.js';
 import { teamsForUser } from './teams.js';
 import { runAutoReplies } from './automation.js';
+import { enrichAdReferralAsync } from './ads.js';
 import { logger } from '../logger.js';
 
 const log = logger('conversations');
@@ -34,9 +35,13 @@ export function ingestInbound(account, inbound) {
       teamId: null,
       status: 'open',
       unread: 0,
+      // Ad attribution for chats started from a Click-to-Messenger ad.
+      adReferral: inbound.referral || null,
       lastMessageAt: inbound.timestamp,
     });
-    log.info(`new conversation ${conversation.id} on ${account.accountName}`);
+    log.info(`new conversation ${conversation.id} on ${account.accountName}`
+      + (inbound.referral ? ` [from ad ${inbound.referral.adId || inbound.referral.ref || ''}]` : ''));
+    if (inbound.referral) enrichAdReferralAsync(account, conversation);
   }
 
   const message = db.messages.insert({
