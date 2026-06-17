@@ -1,5 +1,6 @@
 // OmniChat agent console — zero-build vanilla SPA.
 const state = {
+  token: null,
   user: null,
   users: [],
   meta: null,
@@ -31,13 +32,18 @@ const timeAgo = (iso) => {
 async function api(path, opts = {}) {
   const res = await fetch('/api' + path, {
     ...opts,
-    headers: { 'content-type': 'application/json', 'x-user-id': state.user?.id || '', ...(opts.headers || {}) },
+    headers: { 'content-type': 'application/json', authorization: state.token ? 'Bearer ' + state.token : '', ...(opts.headers || {}) },
   });
+  if (res.status === 401) { logout(); throw new Error('unauthorized'); }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'request failed');
   }
   return res.status === 204 ? null : res.json();
+}
+function logout() {
+  localStorage.removeItem('omnichat_token');
+  location.reload();
 }
 const can = (perm) => (state.meta?.permissions || []).includes(perm);
 
@@ -60,7 +66,7 @@ async function uploadFile(file) {
     headers: {
       'content-type': file.type || 'application/octet-stream',
       'x-file-name': encodeURIComponent(file.name || 'file'),
-      'x-user-id': state.user?.id || '',
+      authorization: state.token ? 'Bearer ' + state.token : '',
     },
     body: file,
   });
@@ -68,26 +74,52 @@ async function uploadFile(file) {
   return res.json();
 }
 
+// ── Login ─────────────────────────────────────────────────────────────────────
+function showLogin(err) {
+  $('#app').classList.add('hidden');
+  let ov = document.getElementById('loginOverlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'loginOverlay'; document.body.appendChild(ov); }
+  ov.className = 'login-overlay';
+  ov.innerHTML = `<form class="login-card" id="loginForm">
+    <div class="login-brand">📨 OmniChat</div>
+    <div class="login-sub">เข้าสู่ระบบเพื่อใช้งาน</div>
+    ${err ? `<div class="login-err">${esc(err)}</div>` : ''}
+    <input id="liEmail" type="email" placeholder="อีเมล" value="u_owner@company-a.com" autocomplete="username" />
+    <input id="liPass" type="password" placeholder="รหัสผ่าน" value="demo1234" autocomplete="current-password" />
+    <button class="btn" type="submit" style="width:100%">เข้าสู่ระบบ</button>
+    <div class="login-hint">เดโม: <b>u_owner@company-a.com</b> / <b>demo1234</b><br/>ลองบทบาทอื่น: u_manager, u_supervisor, u_sales1, u_viewer (รหัสเดียวกัน)</div>
+  </form>`;
+  $('#loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: $('#liEmail').value, password: $('#liPass').value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showLogin(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+      localStorage.setItem('omnichat_token', data.token);
+      location.reload();
+    } catch { showLogin('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); }
+  };
+}
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 async function boot() {
-  // Need a user before /api/me works; fetch users with a best-effort header.
-  state.users = await fetchUsers();
-  const saved = localStorage.getItem('omnichat_user');
-  state.user = state.users.find((u) => u.id === saved) || state.users.find((u) => u.role === 'manager') || state.users[0];
-  await loadContext();
+  state.token = localStorage.getItem('omnichat_token');
+  if (!state.token) return showLogin();
+  try {
+    await loadContext();
+  } catch (e) {
+    localStorage.removeItem('omnichat_token');
+    return showLogin();
+  }
+  state.users = await api('/users');
   buildUserSelector();
   wireNav();
   initSound();
   connectWs();
   render();
-}
-
-async function fetchUsers() {
-  // Bootstrapping: try every user id is overkill; the server lists org users for
-  // any valid user. Use the well-known seeded manager id to fetch the roster.
-  const res = await fetch('/api/users', { headers: { 'x-user-id': 'u_manager' } });
-  if (res.ok) return res.json();
-  return [];
 }
 
 async function loadContext() {
@@ -103,20 +135,27 @@ async function loadContext() {
 
 function buildUserSelector() {
   const sel = $('#userSel');
-  sel.innerHTML = state.users
-    .map((u) => `<option value="${u.id}" ${u.id === state.user.id ? 'selected' : ''}>${esc(u.name)} · ${u.role}</option>`)
-    .join('');
-  sel.onchange = async () => {
-    localStorage.setItem('omnichat_user', sel.value);
-    state.user = state.users.find((u) => u.id === sel.value);
-    await loadContext();
-    connectWs();
-    render();
-  };
+  // The "act as" switcher is a secured impersonation, available to Owner/Admin only.
+  if (can('manage_users')) {
+    sel.classList.remove('hidden');
+    sel.innerHTML = state.users
+      .map((u) => `<option value="${u.id}" ${u.id === state.user.id ? 'selected' : ''}>${esc(u.name)} · ${u.role}</option>`)
+      .join('');
+    sel.onchange = async () => {
+      try {
+        const { token } = await api('/auth/impersonate', { method: 'POST', body: JSON.stringify({ userId: sel.value }) });
+        localStorage.setItem('omnichat_token', token);
+        location.reload();
+      } catch (e) { alert(e.message); }
+    };
+  } else {
+    sel.classList.add('hidden');
+  }
   $('#presenceSel').onchange = async () => {
     await api('/me/presence', { method: 'PUT', body: JSON.stringify({ status: $('#presenceSel').value }) });
   };
   $('#notifBtn').onclick = () => $('#notifPanel').classList.toggle('hidden');
+  $('#logoutBtn').onclick = logout;
 }
 
 function wireNav() {
@@ -133,7 +172,7 @@ function wireNav() {
 function connectWs() {
   if (state.ws) state.ws.close();
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws?userId=${state.user.id}`);
+  const ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(state.token)}`);
   state.ws = ws;
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
@@ -948,7 +987,7 @@ async function renderBroadcast(main) {
 
 // ── Reports / analytics ────────────────────────────────────────────────────────────
 async function downloadCSV(type) {
-  const res = await fetch(`/api/reports/export?type=${type}&range=${state.reportRange}`, { headers: { 'x-user-id': state.user?.id || '' } });
+  const res = await fetch(`/api/reports/export?type=${type}&range=${state.reportRange}`, { headers: { authorization: state.token ? 'Bearer ' + state.token : '' } });
   if (!res.ok) return alert('export failed');
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

@@ -11,6 +11,10 @@ import 'dotenv/config';
 export const config = {
   port: Number(process.env.PORT || 3000),
   publicUrl: process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`,
+  // Secret used to sign JWTs. Set AUTH_SECRET in production.
+  authSecret: process.env.AUTH_SECRET || 'omnichat-dev-secret-change-me',
+  // Default password seeded users get, so the demo is loginable out of the box.
+  demoPassword: process.env.DEMO_PASSWORD || 'demo1234',
 
   channels: {
     messenger: {

@@ -2,6 +2,7 @@ import { WebSocketServer } from 'ws';
 import { URL } from 'node:url';
 import { db } from '../store/db.js';
 import { bus } from '../core/eventBus.js';
+import { verifyToken } from '../core/auth.js';
 import { logger } from '../logger.js';
 
 const log = logger('realtime');
@@ -17,10 +18,10 @@ export function attachRealtime(server) {
 
   wss.on('connection', (ws, req) => {
     const { searchParams } = new URL(req.url, 'http://localhost');
-    const userId = searchParams.get('userId');
-    const user = userId ? db.users.get(userId) : null;
-    if (!user) {
-      ws.close(4001, 'unknown user');
+    const payload = verifyToken(searchParams.get('token'));
+    const user = payload ? db.users.get(payload.sub) : null;
+    if (!user || user.status === 'disabled') {
+      ws.close(4001, 'unauthorized');
       return;
     }
     ws.user = user;

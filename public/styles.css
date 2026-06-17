@@ -228,6 +228,17 @@ code.hookurl { cursor: pointer; font-size: 11px; color: var(--accent); word-brea
 .kcard-sub { font-size: 11px; color: var(--muted); margin: 3px 0 6px; }
 .kcard-meta { display: flex; flex-wrap: wrap; gap: 4px; }
 
+/* Login screen */
+.login-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); padding: 20px; }
+.login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 30px;
+  width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.login-brand { font-size: 26px; font-weight: 700; text-align: center; }
+.login-sub { text-align: center; color: var(--muted); margin-bottom: 6px; }
+.login-card input { width: 100%; padding: 11px; font-size: 15px; }
+.login-err { background: #3a1212; color: #f1707a; border: 1px solid var(--red); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.login-hint { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; margin-top: 4px; }
+
 /* Mobile-only controls hidden on desktop */
 .mobile-only { display: none; }
 

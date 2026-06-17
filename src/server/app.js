@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../store/db.js';
 import { can, PERMISSIONS, ROLES, isEligibleForAssignment } from '../core/rbac.js';
+import { verifyToken, signToken, verifyPassword, hashPassword } from '../core/auth.js';
 import { setPresence } from '../core/presence.js';
 import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchConversations, setStage, setStatus, pipelineConversations, STAGES } from '../core/conversations.js';
 import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
@@ -30,13 +31,23 @@ const MIME_EXT = {
 const mediaType = (mime) =>
   mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'file';
 
-/** Resolve the acting user from the X-User-Id header (demo-grade auth). */
+/** Resolve the acting user from a Bearer JWT. */
 function authMiddleware(req, res, next) {
-  const userId = req.header('x-user-id');
-  const user = userId ? db.users.get(userId) : null;
-  if (!user) return res.status(401).json({ error: 'unknown or missing user (set X-User-Id)' });
+  const auth = req.header('authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const payload = token ? verifyToken(token) : null;
+  const user = payload ? db.users.get(payload.sub) : null;
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+  if (user.status === 'disabled') return res.status(403).json({ error: 'account disabled' });
   req.user = user;
   next();
+}
+
+/** Strip secrets before sending a user to the client. */
+function publicUser(u) {
+  if (!u) return u;
+  const { passwordHash, ...safe } = u;
+  return safe;
 }
 
 const requirePerm = (perm) => (req, res, next) => {
@@ -54,12 +65,32 @@ export function createApp() {
   app.use(express.static(path.join(__dirname, '..', '..', 'public')));
   app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
 
+  // ── Public auth (no token required) ───────────────────────────────────────
+  const auth = express.Router();
+  auth.post('/login', (req, res) => {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    const user = db.users.find((u) => (u.email || '').toLowerCase() === email);
+    if (!user || !verifyPassword(req.body.password, user.passwordHash)) {
+      return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+    }
+    if (user.status === 'disabled') return res.status(403).json({ error: 'บัญชีนี้ถูกระงับ' });
+    res.json({ token: signToken({ sub: user.id }), user: publicUser(user) });
+  });
+  app.use('/api/auth', auth);
+
   const api = express.Router();
   api.use(authMiddleware);
 
+  // Owner/Admin can mint a token to act as another user (secured impersonation).
+  api.post('/auth/impersonate', requirePerm(PERMISSIONS.MANAGE_USERS), (req, res) => {
+    const target = db.users.get(req.body.userId);
+    if (!target || target.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    res.json({ token: signToken({ sub: target.id }), user: publicUser(target) });
+  });
+
   // ── Identity & reference data ─────────────────────────────────────────────
   api.get('/me', (req, res) => {
-    res.json({ user: req.user, permissions: ROLES[req.user.role]?.permissions || [] });
+    res.json({ user: publicUser(req.user), permissions: ROLES[req.user.role]?.permissions || [] });
   });
 
   api.get('/meta', (_req, res) => {
@@ -74,17 +105,18 @@ export function createApp() {
   });
 
   api.get('/users', (req, res) => {
-    res.json(db.users.filter((u) => u.organizationId === req.user.organizationId));
+    res.json(db.users.filter((u) => u.organizationId === req.user.organizationId).map(publicUser));
   });
 
   api.post('/users', requirePerm(PERMISSIONS.MANAGE_USERS), (req, res) => {
-    const { name, email, role } = req.body;
+    const { name, email, role, password } = req.body;
     if (!name || !ROLES[role]) return res.status(400).json({ error: 'name and valid role required' });
     const user = db.users.insert({
       organizationId: req.user.organizationId,
       name, email: email || '', role, presence: 'offline', status: 'invited',
+      passwordHash: hashPassword(password || 'demo1234'),
     });
-    res.status(201).json(user);
+    res.status(201).json(publicUser(user));
   });
 
   // Edit a user's role / status / name (and revoke = status:disabled).
@@ -102,12 +134,12 @@ export function createApp() {
     if (req.body.status && ['active', 'invited', 'disabled'].includes(req.body.status)) {
       patch.status = req.body.status;
     }
-    res.json(db.users.update(target.id, patch));
+    res.json(publicUser(db.users.update(target.id, patch)));
   });
 
   api.put('/me/presence', (req, res) => {
     try {
-      res.json(setPresence(req.user.id, req.body.status));
+      res.json(publicUser(setPresence(req.user.id, req.body.status)));
     } catch (e) {
       res.status(400).json({ error: e.message });
     }

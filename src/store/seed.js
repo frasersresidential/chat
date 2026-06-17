@@ -1,5 +1,7 @@
 import { db } from './db.js';
 import { PRESENCE } from '../core/presence.js';
+import { hashPassword } from '../core/auth.js';
+import { config } from '../config.js';
 import { logger } from '../logger.js';
 
 const log = logger('seed');
@@ -28,8 +30,9 @@ export function seedIfEmpty() {
   const marketingTeam = db.teams.insert({ id: 'team_marketing', organizationId: O, name: 'Marketing Team', parentId: null });
 
   // ── Users (every role) ────────────────────────────────────────────────────
+  const demoHash = hashPassword(config.demoPassword);
   const mkUser = (id, name, role, presence = PRESENCE.OFFLINE) =>
-    db.users.insert({ id, organizationId: O, name, email: `${id}@company-a.com`, role, presence });
+    db.users.insert({ id, organizationId: O, name, email: `${id}@company-a.com`, role, presence, status: 'active', passwordHash: demoHash });
 
   const owner = mkUser('u_owner', 'Olivia Owner', 'owner');
   const admin = mkUser('u_admin', 'Adam Admin', 'admin');
