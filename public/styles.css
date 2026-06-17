@@ -129,3 +129,54 @@ th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: upp
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; }
 .form-grid label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
 .muted { color: var(--muted); }
+
+/* Mobile-only controls hidden on desktop */
+.mobile-only { display: none; }
+
+/* ── Mobile / PWA (phones) ───────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  body { height: 100dvh; overflow: hidden; }
+  #app { height: 100dvh; }
+
+  /* Top bar: compact, horizontally scrollable nav, respect the notch */
+  .topbar {
+    gap: 8px; padding: 0 10px; height: auto; min-height: 52px;
+    padding-top: env(safe-area-inset-top); flex-wrap: wrap;
+  }
+  .brand span { display: none; }            /* keep just the 📨 glyph */
+  .brand { font-size: 22px; }
+  .nav {
+    order: 3; width: 100%; overflow-x: auto; gap: 2px;
+    padding-bottom: 6px; -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button { white-space: nowrap; padding: 7px 12px; }
+  .topbar-right { gap: 6px; }
+  .topbar-right select, .icon-btn { font-size: 12px; padding: 6px 8px; }
+  #userSel { max-width: 42vw; }
+
+  /* Inbox becomes a single screen that swaps list ↔ thread */
+  .inbox-layout { grid-template-columns: 1fr; }
+  #threadPane, #detailPane { display: none; }
+  .conv-list { border-right: none; }
+  .inbox-layout.mobile-thread .conv-list { display: none; }
+  .inbox-layout.mobile-thread #threadPane { display: flex; }
+  .inbox-layout.mobile-detail #detailPane {
+    display: block; position: absolute; inset: 0; z-index: 30;
+    border-left: none; overflow-y: auto;
+  }
+
+  .mobile-only { display: inline-flex; }
+  .msg { max-width: 85%; font-size: 15px; }
+  .conv-item { padding: 14px; }            /* bigger touch targets */
+  .composer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .composer textarea { height: 44px; font-size: 16px; } /* 16px avoids iOS zoom */
+
+  /* Admin pages: tighter padding, let wide tables scroll sideways */
+  .admin { padding: 14px; }
+  .card { overflow-x: auto; }
+  .form-grid { grid-template-columns: 1fr; }
+
+  /* Dropdowns span the screen */
+  .notif-panel { right: 8px; left: 8px; width: auto; top: 56px; }
+}

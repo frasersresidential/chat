@@ -213,6 +213,9 @@ async function openThread(id) {
   document.querySelectorAll('.conv-item').forEach((i) => i.classList.toggle('active', i.dataset.id === id));
   renderThread();
   renderDetail();
+  // On phones, slide into the thread view (the list is a separate screen).
+  document.querySelector('.inbox-layout')?.classList.add('mobile-thread');
+  document.querySelector('.inbox-layout')?.classList.remove('mobile-detail');
 }
 
 function renderThread() {
@@ -223,6 +226,7 @@ function renderThread() {
   pane.classList.add('thread');
   pane.innerHTML = `
     <div class="thread-header">
+      <button class="btn ghost mobile-only" id="backBtn" title="กลับ">‹</button>
       <div class="conv-avatar" style="width:34px;height:34px;background:${(state.meta.channels[c.channel]||{}).color||'#1f6feb'}">${(state.meta.channels[c.channel]||{}).icon||'👤'}</div>
       <div>
         <div style="font-weight:600">${esc(c.customer?.name)} ${c.customer?.vip ? '★' : ''}</div>
@@ -231,6 +235,7 @@ function renderThread() {
       <div class="actions">
         ${can('takeover') ? `<button class="btn ghost" id="takeoverBtn">Take over</button>` : ''}
         ${can('transfer') || can('assign') ? `<button class="btn ghost" id="assignBtn">Assign / Transfer</button>` : ''}
+        <button class="btn ghost mobile-only" id="infoBtn" title="ข้อมูลลูกค้า">ℹ️</button>
       </div>
     </div>
     <div class="messages" id="messages">
@@ -261,6 +266,13 @@ function renderThread() {
     await api('/conversations/' + c.id + '/takeover', { method: 'POST' }); openThread(c.id); refreshInbox();
   };
   if ($('#assignBtn')) $('#assignBtn').onclick = () => assignDialog(c);
+  // Mobile navigation: back returns to the list, info toggles the detail sheet.
+  if ($('#backBtn')) $('#backBtn').onclick = () => {
+    document.querySelector('.inbox-layout')?.classList.remove('mobile-thread', 'mobile-detail');
+  };
+  if ($('#infoBtn')) $('#infoBtn').onclick = () => {
+    document.querySelector('.inbox-layout')?.classList.toggle('mobile-detail');
+  };
 }
 
 async function assignDialog(c) {

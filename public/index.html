@@ -2,8 +2,19 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <title>OmniChat — Omni-Channel Inbox</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0e1117" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="OmniChat" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -20,6 +31,7 @@
         <button data-view="simulator">Simulator</button>
       </nav>
       <div class="topbar-right">
+        <button id="installBtn" class="icon-btn hidden" title="ติดตั้งแอป">⬇️ ติดตั้ง</button>
         <button id="notifBtn" class="icon-btn" title="Notifications">🔔<span id="notifCount" class="badge hidden">0</span></button>
         <select id="presenceSel" title="My availability">
           <option value="online">🟢 Online</option>
@@ -37,5 +49,29 @@
     <main id="main"></main>
   </div>
   <script src="/app.js" type="module"></script>
+  <script>
+    // Register the service worker so the app is installable / works offline.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW register failed', e));
+      });
+    }
+    // Android / desktop Chrome install prompt.
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.remove('hidden');
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.classList.add('hidden');
+    });
+    window.addEventListener('appinstalled', () => installBtn.classList.add('hidden'));
+  </script>
 </body>
 </html>
