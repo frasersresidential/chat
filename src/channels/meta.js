@@ -7,6 +7,28 @@ import { BaseAdapter } from './base.js';
  * name / Ad set name are resolved later via the Graph API (see core/ads.js).
  * `ad_name`/`adset_name` are accepted too so the simulator can inject them.
  */
+/**
+ * Parse a `ref` string into UTM-style fields. Supports query-string encoding
+ * (`utm_source=fb&utm_campaign=summer`, also `|`/`;` separated). Falls back to
+ * the raw value so any custom ref (e.g. "summer_promo") is still tracked.
+ */
+function parseUtm(ref) {
+  if (!ref) return null;
+  if (/=/.test(ref)) {
+    const p = {};
+    for (const part of ref.split(/[&|;]/)) {
+      const [k, v] = part.split('=');
+      if (k && v) p[k.trim().toLowerCase()] = decodeURIComponent(v.trim());
+    }
+    return {
+      source: p.utm_source || null, medium: p.utm_medium || null,
+      campaign: p.utm_campaign || null, content: p.utm_content || null,
+      term: p.utm_term || null, raw: ref,
+    };
+  }
+  return { raw: ref };
+}
+
 function parseReferral(r) {
   if (!r || (r.source !== 'ADS' && !r.ad_id && !r.ref)) return null;
   const ctx = r.ads_context_data || {};
@@ -14,6 +36,7 @@ function parseReferral(r) {
     source: r.source || null,
     type: r.type || null,
     ref: r.ref || null,
+    utm: parseUtm(r.ref),
     adId: r.ad_id || null,
     adTitle: ctx.ad_title || null,
     adName: r.ad_name || ctx.ad_name || null,

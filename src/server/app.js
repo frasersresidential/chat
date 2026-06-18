@@ -6,7 +6,7 @@ import { db } from '../store/db.js';
 import { can, PERMISSIONS, ROLES, isEligibleForAssignment } from '../core/rbac.js';
 import { verifyToken, signToken, verifyPassword, hashPassword } from '../core/auth.js';
 import { setPresence } from '../core/presence.js';
-import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchConversations, setStage, setStatus, pipelineConversations, STAGES } from '../core/conversations.js';
+import { listInbox, getThread, sendReply, markRead, setTags, setGrade, searchConversations, setStage, setStatus, setDealValue, pipelineConversations, STAGES } from '../core/conversations.js';
 import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
@@ -398,6 +398,13 @@ export function createApp() {
     const conv = db.conversations.get(req.params.id);
     if (!conv || conv.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
     try { res.json(decorateConversation(setStatus(conv.id, req.body.status))); }
+    catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  api.put('/conversations/:id/deal-value', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const conv = db.conversations.get(req.params.id);
+    if (!conv || conv.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    try { res.json(decorateConversation(setDealValue(conv.id, req.body.value))); }
     catch (e) { res.status(400).json({ error: e.message }); }
   });
 

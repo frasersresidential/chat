@@ -47,16 +47,31 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   const byAdSet = {};
   const byAd = {};
   let fromAds = 0;
+  // ROI funnel per ad set: chats → won, plus revenue from deal values.
+  const roiByAdSet = {};
+  let adsWon = 0, adsRevenue = 0;
   for (const c of conversations) {
     const r = c.adReferral;
     if (!r) continue;
     fromAds += 1;
-    const adset = r.adsetName || 'ไม่ทราบ Ad set';
+    const adset = r.adsetName || r.utm?.campaign || 'ไม่ทราบ Ad set';
     const ad = r.adName || r.adTitle || 'ไม่ทราบ Ad';
     byAdSet[adset] = (byAdSet[adset] || 0) + 1;
     byAd[ad] = (byAd[ad] || 0) + 1;
+
+    const row = roiByAdSet[adset] || (roiByAdSet[adset] = { adset, chats: 0, won: 0, lost: 0, revenue: 0 });
+    row.chats += 1;
+    if (c.stage === 'won') { row.won += 1; adsWon += 1; }
+    if (c.stage === 'lost') row.lost += 1;
+    const dv = Number(c.dealValue) || 0;
+    if (dv) { row.revenue += dv; adsRevenue += dv; }
   }
+  const adRoi = Object.values(roiByAdSet)
+    .map((r) => ({ ...r, conversion: r.chats ? +(r.won / r.chats * 100).toFixed(1) : 0 }))
+    .sort((a, b) => b.chats - a.chats);
   totals.fromAds = fromAds;
+  totals.adsWon = adsWon;
+  totals.adsRevenue = adsRevenue;
 
   // ── First response time (inbound → first agent reply) ────────────────────
   const msgsByConv = new Map();
@@ -111,7 +126,7 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   const assignmentByType = {};
   for (const a of assignments) assignmentByType[a.assignmentType] = (assignmentByType[a.assignmentType] || 0) + 1;
 
-  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, byAdSet, byAd, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, byAdSet, byAd, adRoi, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────

@@ -187,6 +187,15 @@ export function setStatus(conversationId, status) {
   return updated;
 }
 
+/** Set the deal value (revenue) for ROI reporting; null/0 to clear. */
+export function setDealValue(conversationId, value) {
+  const n = Number(value);
+  if (Number.isNaN(n) || n < 0) throw new Error('invalid deal value');
+  const updated = db.conversations.update(conversationId, { dealValue: n || null });
+  if (updated) bus.emit('conversation:upserted', updated);
+  return updated;
+}
+
 /** All conversations visible to the user (any status) for the Kanban board. */
 export function pipelineConversations(user) {
   const canSeeAll = can(user, PERMISSIONS.VIEW_ALL_CONVERSATIONS);

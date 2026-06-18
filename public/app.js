@@ -579,16 +579,22 @@ function renderDetail() {
     <div class="row"><span class="muted">Owner</span><span>${esc(c.assignedUserName || '—')}</span></div>
 
     ${c.adReferral ? `
-    <h4>📣 มาจาก Facebook Ads</h4>
-    <div class="row"><span class="muted">Ad name</span><span>${esc(c.adReferral.adName || c.adReferral.adTitle || '—')}</span></div>
-    <div class="row"><span class="muted">Ad set</span><span>${esc(c.adReferral.adsetName || '—')}</span></div>
-    <div class="row"><span class="muted">Campaign</span><span>${esc(c.adReferral.campaignName || '—')}</span></div>
-    ${c.adReferral.ref ? `<div class="row"><span class="muted">Ref</span><span>${esc(c.adReferral.ref)}</span></div>` : ''}` : ''}
+    <h4>📣 ที่มา (Ads / Ref)</h4>
+    ${(c.adReferral.adName || c.adReferral.adTitle) ? `<div class="row"><span class="muted">Ad name</span><span>${esc(c.adReferral.adName || c.adReferral.adTitle)}</span></div>` : ''}
+    ${c.adReferral.adsetName ? `<div class="row"><span class="muted">Ad set</span><span>${esc(c.adReferral.adsetName)}</span></div>` : ''}
+    ${c.adReferral.campaignName ? `<div class="row"><span class="muted">Campaign</span><span>${esc(c.adReferral.campaignName)}</span></div>` : ''}
+    ${c.adReferral.utm?.source ? `<div class="row"><span class="muted">utm_source</span><span>${esc(c.adReferral.utm.source)}</span></div>` : ''}
+    ${c.adReferral.utm?.medium ? `<div class="row"><span class="muted">utm_medium</span><span>${esc(c.adReferral.utm.medium)}</span></div>` : ''}
+    ${c.adReferral.utm?.campaign ? `<div class="row"><span class="muted">utm_campaign</span><span>${esc(c.adReferral.utm.campaign)}</span></div>` : ''}
+    ${c.adReferral.ref ? `<div class="row"><span class="muted">ref</span><span>${esc(c.adReferral.ref)}</span></div>` : ''}` : ''}
 
     <h4>Pipeline stage</h4>
     <select id="stageSel" ${editable ? '' : 'disabled'}>
       ${Object.entries(STAGE_LABEL).map(([k, v]) => `<option value="${k}" ${(c.stage || 'new') === k ? 'selected' : ''}>${v}</option>`).join('')}
     </select>
+
+    <h4>มูลค่าดีล (บาท)</h4>
+    <input id="dealInput" type="number" min="0" step="any" value="${c.dealValue || ''}" placeholder="เช่น 2500000" ${editable ? '' : 'disabled'} style="width:100%" />
 
     <h4>Grade (เกรดลูกค้า)</h4>
     <div class="grade-row">
@@ -613,6 +619,12 @@ function renderDetail() {
     try {
       const updated = await api('/conversations/' + c.id + '/stage', { method: 'PUT', body: JSON.stringify({ stage: $('#stageSel').value }) });
       state.thread.conversation = updated; refreshInbox();
+    } catch (e) { alert(e.message); }
+  };
+  $('#dealInput').onchange = async () => {
+    try {
+      const updated = await api('/conversations/' + c.id + '/deal-value', { method: 'PUT', body: JSON.stringify({ value: $('#dealInput').value || 0 }) });
+      state.thread.conversation = updated;
     } catch (e) { alert(e.message); }
   };
   pane.querySelectorAll('[data-grade]').forEach((b) => b.onclick = async () => {
@@ -1042,8 +1054,9 @@ async function renderReports(main) {
       ${stat('Avg first response', r.avgFirstResponseMin != null ? r.avgFirstResponseMin + 'm' : '—', 'inbound → first reply')}
       ${stat('VIP chats', t.vip)}
       ${stat('Agents online', t.agentsOnline)}
-      ${stat('Active channels', t.activeChannels)}
-      ${stat('Messages', t.messages)}
+      ${stat('แชตจากโฆษณา', t.fromAds || 0)}
+      ${stat('ปิดการขายจากโฆษณา', t.adsWon || 0, t.fromAds ? `${(t.adsWon / t.fromAds * 100).toFixed(1)}% conversion` : '')}
+      ${stat('รายได้จากโฆษณา', '฿' + (t.adsRevenue || 0).toLocaleString())}
     </div>
 
     <div class="report-cols">
@@ -1107,6 +1120,17 @@ async function renderReports(main) {
           const max = Math.max(1, ...Object.values(a));
           return Object.entries(a).sort((x, y) => y[1] - x[1]).map(([k, v]) => bar(k, v, max, '#7c5cff')).join(''); })()}
       </div>
+    </div>
+
+    <div class="card">
+      <h3>💰 ROI โฆษณา → ปิดการขาย (ต่อ Ad set)</h3>
+      ${(r.adRoi && r.adRoi.length) ? `<table>
+        <thead><tr><th>Ad set</th><th>แชต</th><th>ปิดได้ (won)</th><th>เสีย (lost)</th><th>Conversion</th><th>รายได้</th></tr></thead>
+        <tbody>${r.adRoi.map((a) => `<tr>
+          <td>${esc(a.adset)}</td><td>${a.chats}</td><td>${a.won}</td><td>${a.lost}</td>
+          <td><b>${a.conversion}%</b></td><td>฿${(a.revenue || 0).toLocaleString()}</td>
+        </tr>`).join('')}</tbody></table>`
+        : '<p class="muted">ยังไม่มีแชตจากโฆษณา — ใส่ Ad ใน Simulator หรือต่อเพจจริง แล้วเลื่อน stage เป็น won + กรอกมูลค่าดีล</p>'}
     </div>
   </div>`;
   $('#rangeSel').value = state.reportRange;
