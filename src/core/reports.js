@@ -54,8 +54,8 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
     const r = c.adReferral;
     if (!r) continue;
     fromAds += 1;
-    const adset = r.adsetName || r.utm?.campaign || 'ไม่ทราบ Ad set';
-    const ad = r.adName || r.adTitle || 'ไม่ทราบ Ad';
+    const adset = r.adsetName || r.utm?.campaign || (r.adId ? `Ad ${r.adId}` : 'ไม่ทราบ Ad set');
+    const ad = r.adName || r.adTitle || (r.adId ? `Ad ${r.adId}` : 'ไม่ทราบ Ad');
     byAdSet[adset] = (byAdSet[adset] || 0) + 1;
     byAd[ad] = (byAd[ad] || 0) + 1;
 

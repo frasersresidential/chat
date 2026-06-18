@@ -578,15 +578,24 @@ function renderDetail() {
     <div class="row"><span class="muted">Account</span><span>${esc(c.accountName)}</span></div>
     <div class="row"><span class="muted">Owner</span><span>${esc(c.assignedUserName || '—')}</span></div>
 
-    ${c.adReferral ? `
-    <h4>📣 ที่มา (Ads / Ref)</h4>
-    ${(c.adReferral.adName || c.adReferral.adTitle) ? `<div class="row"><span class="muted">Ad name</span><span>${esc(c.adReferral.adName || c.adReferral.adTitle)}</span></div>` : ''}
-    ${c.adReferral.adsetName ? `<div class="row"><span class="muted">Ad set</span><span>${esc(c.adReferral.adsetName)}</span></div>` : ''}
-    ${c.adReferral.campaignName ? `<div class="row"><span class="muted">Campaign</span><span>${esc(c.adReferral.campaignName)}</span></div>` : ''}
-    ${c.adReferral.utm?.source ? `<div class="row"><span class="muted">utm_source</span><span>${esc(c.adReferral.utm.source)}</span></div>` : ''}
-    ${c.adReferral.utm?.medium ? `<div class="row"><span class="muted">utm_medium</span><span>${esc(c.adReferral.utm.medium)}</span></div>` : ''}
-    ${c.adReferral.utm?.campaign ? `<div class="row"><span class="muted">utm_campaign</span><span>${esc(c.adReferral.utm.campaign)}</span></div>` : ''}
-    ${c.adReferral.ref ? `<div class="row"><span class="muted">ref</span><span>${esc(c.adReferral.ref)}</span></div>` : ''}` : ''}
+    ${c.adReferral ? (() => {
+      const a = c.adReferral;
+      const isAd = a.source === 'ADS' || !!a.adId;
+      const u = a.utm || {};
+      return `
+      <h4>📣 ${isAd ? 'มาจาก Meta Ads' : 'ที่มา (Referral)'}</h4>
+      ${isAd ? `
+        <div class="row"><span class="muted">Ad name</span><span>${esc(a.adName || a.adTitle || '—')}</span></div>
+        <div class="row"><span class="muted">Ad set name</span><span>${esc(a.adsetName || '—')}</span></div>
+        <div class="row"><span class="muted">Campaign</span><span>${esc(a.campaignName || '—')}</span></div>
+        ${a.adId ? `<div class="row"><span class="muted">Ad ID</span><span>${esc(a.adId)}</span></div>` : ''}
+        ${(!a.adName && !a.adsetName) ? `<div class="muted" style="font-size:11px">* ต้องให้ Page token มีสิทธิ์ ads_read จึงจะดึงชื่อ Ad/Ad set ได้</div>` : ''}
+      ` : ''}
+      ${u.source ? `<div class="row"><span class="muted">utm_source</span><span>${esc(u.source)}</span></div>` : ''}
+      ${u.medium ? `<div class="row"><span class="muted">utm_medium</span><span>${esc(u.medium)}</span></div>` : ''}
+      ${u.campaign ? `<div class="row"><span class="muted">utm_campaign</span><span>${esc(u.campaign)}</span></div>` : ''}
+      ${a.ref ? `<div class="row"><span class="muted">ref</span><span>${esc(a.ref)}</span></div>` : ''}`;
+    })() : ''}
 
     <h4>Pipeline stage</h4>
     <select id="stageSel" ${editable ? '' : 'disabled'}>
