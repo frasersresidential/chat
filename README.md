@@ -2,7 +2,8 @@
 
 โครงสร้างแดชบอร์ดสำหรับ **สร้างคอนเทนต์โซเชียลด้วย AI** (สไตล์ Hero AI) สร้างด้วย **Next.js (App Router) + TypeScript + Tailwind CSS**
 
-> เวอร์ชันนี้เป็น **โครงสร้างทั้งระบบ** ใช้ข้อมูลตัวอย่าง (mock) — ยังไม่ต่อ AI จริง มีจุดต่อ AI เตรียมไว้แล้วที่ `src/lib/ai/provider.ts`
+> เวอร์ชันนี้วาง **โครงสร้างทั้งระบบ** และ **ต่อ AI จริงแล้ว** ด้วย Claude (Opus 4.8)
+> ผ่าน Anthropic SDK — ถ้ายังไม่ตั้ง `ANTHROPIC_API_KEY` ระบบจะ fallback เป็นผลลัพธ์ตัวอย่าง (mock) ให้แอปรันได้
 
 ## เริ่มใช้งาน
 
@@ -51,17 +52,29 @@ src/
     └── ai/provider.ts          จุดต่อ AI (ตอนนี้เป็น mock)
 ```
 
-## ต่อ AI จริงในอนาคต
+## การต่อ AI (Claude)
 
-1. สร้าง class ใหม่ที่ implement `GenerationProvider` ใน `src/lib/ai/provider.ts`
-   (เช่นเรียก Claude / Gemini ผ่าน API route)
-2. คืน provider นั้นใน `getProvider()` (อ่านค่าจาก env เช่น `AI_PROVIDER`)
-3. หน้า UI ทุก Studio เรียกผ่าน interface กลางอยู่แล้ว — ไม่ต้องแก้
+ต่อกับ Claude ผ่าน Anthropic SDK เรียบร้อยแล้ว:
+
+- `src/lib/ai/provider.ts` — interface กลาง + `AnthropicProvider` (Claude Opus 4.8, adaptive thinking) + `MockProvider`
+- `src/app/api/generate/route.ts` — API route ฝั่ง server (คีย์ไม่หลุดไป client)
+- หน้า Studio เรียกผ่าน `fetch('/api/generate')`
+
+**เปิดใช้งาน AI จริง:**
+
+```bash
+cp .env.example .env.local
+# แล้วใส่ ANTHROPIC_API_KEY=sk-ant-... (ขอที่ https://console.anthropic.com)
+```
+
+ถ้าไม่ตั้งคีย์ ระบบจะใช้ผลลัพธ์ตัวอย่าง (mock) แทนโดยอัตโนมัติ
+
+**สลับไปโมเดล/ผู้ให้บริการอื่น** (เช่น Gemini): สร้าง class ใหม่ที่ implement `GenerationProvider`
+แล้วเลือกใน `getProvider()` — ไม่ต้องแก้หน้า UI
 
 ## สิ่งที่ยังไม่ทำ (ขั้นต่อไป)
 
-- ต่อโมเดล AI จริง + API routes
+- ต่อ AI ในฝั่ง Visual Studio (สร้างภาพจริง)
 - ระบบ auth / ผู้ใช้จริง
 - ฐานข้อมูล (เก็บผลงาน, เครดิต, แบรนด์)
 - drag & drop ในปฏิทินคอนเทนต์
-- ระบบสร้างภาพใน Visual Studio

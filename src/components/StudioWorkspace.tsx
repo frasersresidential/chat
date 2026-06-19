@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { getProvider } from "@/lib/ai/provider";
 import { Icon } from "./Icon";
 
 type Props = {
@@ -18,15 +17,27 @@ export function StudioWorkspace({ studio, placeholder, platforms, presets }: Pro
   const [platform, setPlatform] = useState(platforms?.[0] ?? "");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleGenerate() {
     if (!prompt.trim() || loading) return;
     setLoading(true);
     setResult(null);
-    const provider = getProvider();
-    const res = await provider.generate({ studio, prompt, platform });
-    setResult(res.text);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studio, prompt, platform }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "เกิดข้อผิดพลาด");
+      setResult(data.text);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -82,7 +93,7 @@ export function StudioWorkspace({ studio, placeholder, platforms, presets }: Pro
           {loading ? "กำลังสร้าง…" : "สร้างคอนเทนต์"}
         </button>
         <p className="mt-2 text-center text-[11px] text-slate-400">
-          * เวอร์ชันนี้ยังไม่ต่อ AI จริง — แสดงผลลัพธ์ตัวอย่าง
+          ใช้ Claude (Opus 4.8) — ถ้ายังไม่ตั้ง ANTHROPIC_API_KEY จะแสดงผลลัพธ์ตัวอย่าง
         </p>
       </div>
 
@@ -96,6 +107,10 @@ export function StudioWorkspace({ studio, placeholder, platforms, presets }: Pro
             <div className="h-3 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
             <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
             <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          </div>
+        ) : error ? (
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+            {error}
           </div>
         ) : result ? (
           <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700 dark:text-slate-200">
