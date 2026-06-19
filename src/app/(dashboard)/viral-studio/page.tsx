@@ -1,51 +1,99 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/PageHeader";
-import { StudioWorkspace } from "@/components/StudioWorkspace";
 import { Icon } from "@/components/Icon";
-import { trends } from "@/lib/mock-data";
+import { viralNew, viralFeatured, type ViralCard } from "@/lib/mock-data";
 
 export default function ViralStudioPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        icon="flame"
-        title="Viral Studio"
-        description="หาเทรนด์ดัง · มาแรง แล้วแปลงเป็นคอนเทนต์พร้อมถ่าย"
-      />
+    <div className="space-y-8">
+      {/* header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
+            <Icon name="flame" className="h-6 w-6 text-orange-500" /> Viral Studio
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            เลือกเทรนด์ที่สนใจ กรอกข้อมูลนิดเดียว แล้ว AI จะสร้างให้ครบชุด!
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300">
+            <Icon name="doc" className="h-3.5 w-3.5" /> ประวัติของฉัน
+          </button>
+          <button className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-slate-50 dark:border-slate-700">
+            <Icon name="arrow" className="h-3.5 w-3.5" /> วิธีใช้งาน
+          </button>
+        </div>
+      </div>
 
-      {/* เทรนด์ที่มาแรงตอนนี้ */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-          <Icon name="flame" className="h-5 w-5 text-orange-500" /> เทรนด์มาแรงตอนนี้
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {trends.map((t) => (
-            <div
-              key={t.id}
-              className="rounded-lg border border-slate-200 p-3 transition-colors hover:border-brand-300 dark:border-slate-700"
-            >
-              <div className="mb-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                {t.title}
-              </div>
-              <div className="text-xs text-slate-400">
-                ใช้ {t.uses} ครั้ง · {t.category}
-              </div>
-              <Link
-                href="/saved-viral"
-                className="mt-2 inline-flex items-center gap-1 text-xs text-brand-600"
-              >
-                <Icon name="bookmark" className="h-3.5 w-3.5" /> บันทึก
-              </Link>
-            </div>
+      {/* มาใหม่สัปดาห์นี้ */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+            <Icon name="sparkles" className="h-5 w-5 text-brand-500" /> มาใหม่สัปดาห์นี้
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-600/20">
+              +3
+            </span>
+          </h2>
+          <button className="flex items-center gap-1 text-xs text-brand-600">
+            ดูทั้งหมด <Icon name="arrow" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {viralNew.map((c) => (
+            <ViralImageCard key={c.id} card={c} large />
           ))}
         </div>
       </section>
 
-      <StudioWorkspace
-        studio="Viral Studio"
-        placeholder="เลือกเทรนด์ด้านบน หรือพิมพ์หัวข้อ เช่น: ทำ Reel ท่องเที่ยวเชียงใหม่จากเทรนด์ที่กำลังฮิต"
-        platforms={["TikTok", "Instagram", "YouTube"]}
-      />
+      {/* เทรนด์แนะนำ */}
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+          <Icon name="trophy" className="h-5 w-5 text-amber-500" /> เทรนด์แนะนำ
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {viralFeatured.map((c) => (
+            <ViralImageCard key={c.id} card={c} />
+          ))}
+        </div>
+      </section>
     </div>
+  );
+}
+
+function ViralImageCard({ card, large }: { card: ViralCard; large?: boolean }) {
+  return (
+    <article className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
+      <div
+        className={`relative flex ${
+          large ? "aspect-[4/3]" : "aspect-square"
+        } items-end bg-gradient-to-br ${card.gradient}`}
+      >
+        {/* badges */}
+        <div className="absolute left-2 top-2 flex gap-1.5">
+          {card.badge && (
+            <span className="rounded-full bg-brand-600/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur">
+              ✦ {card.badge}
+            </span>
+          )}
+        </div>
+        {card.tag === "HOT" && (
+          <span className="absolute right-2 top-2 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
+            HOT
+          </span>
+        )}
+        {card.tag === "ภาพไวรัล" && (
+          <span className="absolute bottom-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+            ✦ ภาพไวรัล
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-white">
+          {card.title}
+        </h3>
+        <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-400">
+          <Icon name="flame" className="h-3.5 w-3.5 text-orange-400" /> {card.meta}
+        </div>
+      </div>
+    </article>
   );
 }
