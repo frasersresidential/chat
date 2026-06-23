@@ -14,6 +14,7 @@ import { buildReport, exportConversationsCSV, exportAgentsCSV } from '../core/re
 import { broadcast, broadcastAudience } from '../core/automation.js';
 import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } from '../core/businessHours.js';
 import { createReminder, listReminders, completeReminder, remindersForConversation } from '../core/reminders.js';
+import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../core/dailyReport.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -213,6 +214,34 @@ export function createApp() {
 
   api.get('/reports', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
     res.json(buildReport(req.user.organizationId, { rangeDays: parseRange(req.query) }));
+  });
+
+  // Pending-chats summary — visible to anyone who can see team/all conversations
+  // (supervisors included), so it isn't gated behind full analytics.
+  const canSeeTeam = (req, res, next) =>
+    (can(req.user, PERMISSIONS.VIEW_TEAM_CONVERSATIONS) || can(req.user, PERMISSIONS.VIEW_ALL_CONVERSATIONS))
+      ? next() : res.status(403).json({ error: 'forbidden' });
+
+  api.get('/reports/pending', canSeeTeam, (req, res) => {
+    res.json(buildPendingSummary(req.user.organizationId));
+  });
+
+  api.post('/reports/daily/send', requirePerm(PERMISSIONS.TAKEOVER), (req, res) => {
+    res.json(sendDailyReport(req.user.organizationId));
+  });
+
+  api.get('/daily-report', canSeeTeam, (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    res.json(org?.dailyReport || defaultDailyReport());
+  });
+  api.put('/daily-report', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    const cfg = {
+      enabled: !!req.body.enabled,
+      time: /^\d{2}:\d{2}$/.test(req.body.time) ? req.body.time : (org?.dailyReport?.time || '18:00'),
+    };
+    db.organizations.update(org.id, { dailyReport: cfg });
+    res.json(cfg);
   });
 
   api.get('/reports/export', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {

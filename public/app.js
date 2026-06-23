@@ -1198,6 +1198,7 @@ async function renderReports(main) {
   try { r = await api('/reports?range=' + state.reportRange); }
   catch (e) { main.innerHTML = `<div class="admin"><h2>Reports</h2><p class="muted">You need View Analytics permission (Owner / Admin / Manager).</p></div>`; return; }
 
+  const [pending, daily] = await Promise.all([api('/reports/pending').catch(() => null), api('/daily-report').catch(() => null)]);
   const t = r.totals;
   const channelLabel = (k) => (state.meta.channels[k] || {}).label || k;
   const channelIcon = (k) => (state.meta.channels[k] || {}).icon || '';
@@ -1234,6 +1235,28 @@ async function renderReports(main) {
       ${stat('แชตจากโฆษณา', t.fromAds || 0)}
       ${stat('ปิดการขายจากโฆษณา', t.adsWon || 0, t.fromAds ? `${(t.adsWon / t.fromAds * 100).toFixed(1)}% conversion` : '')}
       ${stat('รายได้จากโฆษณา', '฿' + (t.adsRevenue || 0).toLocaleString())}
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <h3 style="margin:0">📊 แชตค้างตอบตอนนี้ (${pending?.totalPending || 0} ราย)</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${daily ? `<label class="muted" style="font-size:12px">ส่งทุกวัน <input type="time" id="drTime" value="${daily.time}" style="width:108px" /></label>
+          <label style="display:inline-flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" id="drEnabled" ${daily.enabled ? 'checked' : ''} /> เปิด</label>
+          <button class="btn ghost" id="drSave">บันทึก</button>` : ''}
+          <button class="btn" id="drSend">ส่งให้หัวหน้าเดี๋ยวนี้</button>
+        </div>
+      </div>
+      <p class="muted" style="font-size:12px">ระบบส่งสรุปนี้ให้ Supervisor / Manager อัตโนมัติทุกวัน — ค้างที่ sales คนไหน โครงการอะไร กี่ราย</p>
+      ${pending && pending.byAgent.length ? `<table>
+        <thead><tr><th>พนักงานขาย</th><th>ค้างตอบ</th><th>แยกตามโครงการ</th></tr></thead>
+        <tbody>${pending.byAgent.map((a) => `<tr>
+          <td>${esc(a.name)}</td><td><b>${a.count}</b></td>
+          <td>${Object.entries(a.projects).map(([p, n]) => `<span class="chip">${esc(p)}: ${n}</span>`).join(' ')}</td>
+        </tr>`).join('')}
+        ${pending.unassignedPending ? `<tr><td class="muted">ยังไม่มอบหมาย</td><td><b>${pending.unassignedPending}</b></td><td></td></tr>` : ''}
+        </tbody></table>` : '<p class="muted">ไม่มีแชตค้างตอบ 🎉</p>'}
+      <div id="drResult" class="muted" style="margin-top:8px"></div>
     </div>
 
     <div class="report-cols">
@@ -1325,6 +1348,14 @@ async function renderReports(main) {
   $('#rangeSel').onchange = () => { state.reportRange = $('#rangeSel').value; renderReports(main); };
   $('#expConv').onclick = () => downloadCSV('conversations');
   $('#expAgents').onclick = () => downloadCSV('agents');
+  if ($('#drSend')) $('#drSend').onclick = async () => {
+    try { const res = await api('/reports/daily/send', { method: 'POST' }); $('#drResult').textContent = `✓ ส่งสรุปให้หัวหน้าแล้ว ${res.sent} คน (ค้างตอบ ${res.summary.totalPending} ราย)`; }
+    catch (e) { $('#drResult').textContent = '✕ ' + e.message; }
+  };
+  if ($('#drSave')) $('#drSave').onclick = async () => {
+    try { await api('/daily-report', { method: 'PUT', body: JSON.stringify({ enabled: $('#drEnabled').checked, time: $('#drTime').value }) }); $('#drResult').textContent = '✓ บันทึกการตั้งเวลาแล้ว'; }
+    catch (e) { $('#drResult').textContent = '✕ ' + e.message; }
+  };
 }
 function gradeColor(g) {
   return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';

@@ -6,6 +6,7 @@ import { attachRealtime } from './server/realtime.js';
 import { seedIfEmpty } from './store/seed.js';
 import { applyEnvCredentials } from './store/envCredentials.js';
 import { startReminderScheduler } from './core/reminders.js';
+import { startDailyReportScheduler } from './core/dailyReport.js';
 import { logger } from './logger.js';
 
 const log = logger('boot');
@@ -17,6 +18,7 @@ const app = createApp();
 const server = http.createServer(app);
 attachRealtime(server);
 startReminderScheduler();
+startDailyReportScheduler();
 
 /** First non-internal IPv4 — the address phones on the same Wi-Fi can reach. */
 function lanAddress() {
