@@ -29,6 +29,17 @@ const timeAgo = (iso) => {
   return Math.floor(d / 86400) + 'd';
 };
 
+// Customer avatar (real profile photo if we have one, else the channel glyph).
+function avatarHtml(c, size = 38) {
+  const m = (state.meta?.channels?.[c.channel]) || {};
+  if (c.customer?.avatar) {
+    return `<div class="conv-avatar has-img" style="width:${size}px;height:${size}px">
+      <img src="${esc(c.customer.avatar)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'"/>
+      <span class="ch-badge" style="background:${m.color || '#1f6feb'}">${m.icon || ''}</span></div>`;
+  }
+  return `<div class="conv-avatar" style="width:${size}px;height:${size}px;background:${m.color || '#1f6feb'}">${m.icon || '👤'}</div>`;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const res = await fetch('/api' + path, {
@@ -315,7 +326,7 @@ async function doSearch(q) {
     const m = meta[c.channel] || {};
     return `
     <div class="conv-item ${c.id === state.selectedId ? 'active' : ''}" data-id="${c.id}">
-      <div class="conv-avatar" style="background:${m.color || '#1f6feb'}">${m.icon || '👤'}</div>
+      ${avatarHtml(c)}
       <div class="conv-main">
         <div class="conv-top"><span class="conv-name">${esc(c.customer?.name)}</span>
           <span class="conv-time">${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}</span></div>
@@ -339,7 +350,7 @@ async function refreshInbox() {
     const m = meta[c.channel] || {};
     return `
     <div class="conv-item ${c.id === state.selectedId ? 'active' : ''}" data-id="${c.id}">
-      <div class="conv-avatar" style="background:${m.color || '#1f6feb'}">${m.icon || '👤'}</div>
+      ${avatarHtml(c)}
       <div class="conv-main">
         <div class="conv-top">
           <span class="conv-name">${esc(c.customer?.name)}</span>
@@ -386,7 +397,7 @@ function renderThread() {
   pane.innerHTML = `
     <div class="thread-header">
       <button class="btn ghost mobile-only" id="backBtn" title="กลับ">‹</button>
-      <div class="conv-avatar" style="width:34px;height:34px;background:${(state.meta.channels[c.channel]||{}).color||'#1f6feb'}">${(state.meta.channels[c.channel]||{}).icon||'👤'}</div>
+      ${avatarHtml(c, 34)}
       <div>
         <div style="font-weight:600">${esc(c.customer?.name)} ${c.customer?.vip ? '★' : ''}</div>
         <div class="muted" style="font-size:12px">${esc(c.accountName)} · ${esc(c.channelLabel)}</div>
@@ -1405,6 +1416,7 @@ async function renderSimulator(main) {
       <div><label>Customer id</label><input id="sId" value="cust_${Math.floor(Math.random()*9999)}" /></div>
       <div><label>VIP?</label><select id="sVip"><option value="">No</option><option value="1">Yes (VIP)</option></select></div>
       <div style="grid-column:1/-1"><label>Message</label><input id="sText" value="สวัสดีครับ สนใจสินค้า" /></div>
+      <div style="grid-column:1/-1"><label>รูปโปรไฟล์ (URL — เว้นว่าง = สุ่มรูปให้)</label><input id="sAvatar" placeholder="https://..." /></div>
       <div><label>Ad name (จำลอง CTM ads — Messenger)</label><input id="sAdName" placeholder="เว้นว่าง = ไม่ใช่จากโฆษณา" /></div>
       <div><label>Ad set name</label><input id="sAdSet" placeholder="เช่น คนสนใจคอนโด-กรุงเทพ" /></div>
       <div><button class="btn" id="sSend">Send inbound</button></div>
@@ -1412,7 +1424,8 @@ async function renderSimulator(main) {
   </div>`;
   $('#sSend').onclick = async () => {
     const [channel, accountId] = $('#sAcc').value.split('|');
-    const body = { accountId, participantId: $('#sId').value, participantName: $('#sName').value, text: $('#sText').value, vip: !!$('#sVip').value, adName: $('#sAdName').value.trim(), adsetName: $('#sAdSet').value.trim() };
+    const avatar = $('#sAvatar').value.trim() || ('https://i.pravatar.cc/150?u=' + encodeURIComponent($('#sId').value));
+    const body = { accountId, participantId: $('#sId').value, participantName: $('#sName').value, avatar, text: $('#sText').value, vip: !!$('#sVip').value, adName: $('#sAdName').value.trim(), adsetName: $('#sAdSet').value.trim() };
     const res = await fetch('/webhooks/' + channel, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(buildWebhookPayload(channel, body)) });
     $('#simResult').textContent = res.ok ? '✓ Sent — check the Inbox (switch user to the assigned agent if needed).' : '✕ Failed: ' + res.status;
   };
@@ -1420,9 +1433,9 @@ async function renderSimulator(main) {
 // Build a platform-shaped payload from the simple form (mock is pass-through).
 function buildWebhookPayload(channel, b) {
   if (channel === 'mock') return b;
-  if (channel === 'line') return { destination: b.accountId, events: [{ type: 'message', message: { type: 'text', id: 'm' + Date.now(), text: b.text }, source: { userId: b.participantId } }] };
+  if (channel === 'line') return { destination: b.accountId, events: [{ type: 'message', message: { type: 'text', id: 'm' + Date.now(), text: b.text }, source: { userId: b.participantId, displayName: b.participantName, pictureUrl: b.avatar } }] };
   if (channel === 'messenger' || channel === 'instagram') {
-    const msg = { sender: { id: b.participantId, name: b.participantName }, message: { mid: 'm' + Date.now(), text: b.text } };
+    const msg = { sender: { id: b.participantId, name: b.participantName, profile_pic: b.avatar }, message: { mid: 'm' + Date.now(), text: b.text } };
     if (b.adName || b.adsetName) {
       msg.referral = { source: 'ADS', type: 'OPEN_THREAD', ad_id: 'sim_' + Date.now(),
         ads_context_data: { ad_title: b.adName, ad_name: b.adName, adset_name: b.adsetName } };

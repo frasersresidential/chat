@@ -41,6 +41,7 @@ export function ingestInbound(account, inbound) {
     });
     log.info(`new conversation ${conversation.id} on ${account.accountName}`
       + (inbound.referral ? ` [from ad ${inbound.referral.adId || inbound.referral.ref || ''}]` : ''));
+    enrichProfileAsync(account, conversation); // fetch real name + avatar from the platform
   }
 
   const message = db.messages.insert({
@@ -84,6 +85,21 @@ export function ingestInbound(account, inbound) {
   // Fire auto-replies asynchronously so ingestion stays fast.
   runAutoReplies({ account, conversation, text: inbound.text, isNew });
   return { conversation, message };
+}
+
+/** Resolve the customer's real display name + avatar from the platform API. */
+async function enrichProfileAsync(account, conversation) {
+  const adapter = getAdapter(account.channelType);
+  if (!adapter?.fetchProfile) return;
+  try {
+    const p = await adapter.fetchProfile(account, conversation.participantId);
+    if (!p) return;
+    const cust = { ...conversation.customer };
+    if (p.name && (!cust.name || cust.name === 'Customer')) cust.name = p.name;
+    if (p.avatar) cust.avatar = p.avatar;
+    const updated = db.conversations.update(conversation.id, { customer: cust });
+    if (updated) bus.emit('conversation:upserted', updated);
+  } catch { /* best-effort */ }
 }
 
 /** Enrich a Meta-ads conversation (resolve Ad set name) then route it. */

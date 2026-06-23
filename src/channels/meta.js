@@ -86,6 +86,7 @@ export class MetaAdapter extends BaseAdapter {
         out.push({
           participantId: ev.sender?.id,
           participantName: ev.sender?.name || null,
+          avatar: ev.sender?.profile_pic || null, // sim can include it; real avatar via fetchProfile
           text: ev.message.text || '',
           attachments: ev.message.attachments || [],
           externalMessageId: ev.message.mid,
@@ -111,5 +112,17 @@ export class MetaAdapter extends BaseAdapter {
     if (!res.ok) throw new Error(`Graph API ${res.status}: ${await res.text()}`);
     const json = await res.json();
     return json.message_id;
+  }
+
+  async fetchProfile(account, participantId) {
+    const token = account?.credential?.accessToken;
+    if (!token || !participantId) return null;
+    // Messenger/WhatsApp expose first_name/last_name; Instagram exposes name/username.
+    const fields = this.type === 'instagram' ? 'name,username,profile_pic' : 'first_name,last_name,profile_pic';
+    const res = await fetch(`https://graph.facebook.com/v19.0/${participantId}?fields=${fields}&access_token=${token}`);
+    if (!res.ok) return null;
+    const d = await res.json();
+    const name = d.name || [d.first_name, d.last_name].filter(Boolean).join(' ') || d.username || null;
+    return { name: name || null, avatar: d.profile_pic || null };
   }
 }

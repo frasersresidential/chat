@@ -44,6 +44,14 @@ export class BaseAdapter {
   }
 
   /**
+   * Fetch the customer's real display name + avatar from the platform's profile
+   * API. Returns { name, avatar } or null (default: unsupported / no token).
+   */
+  async fetchProfile(_account, _participantId) {
+    return null;
+  }
+
+  /**
    * Outbound entry point. Real delivery only happens when the account carries a
    * usable access token; otherwise we simulate so the whole platform runs with
    * zero credentials (the message is still stored & shown in the inbox).

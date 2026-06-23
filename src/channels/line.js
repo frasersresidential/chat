@@ -35,7 +35,8 @@ export class LineAdapter extends BaseAdapter {
       if (ev.type !== 'message' || ev.message?.type !== 'text') continue;
       out.push({
         participantId: ev.source?.userId,
-        participantName: null, // resolve via profile API if needed
+        participantName: ev.source?.displayName || null, // sim can include it; real name via fetchProfile
+        avatar: ev.source?.pictureUrl || null,
         text: ev.message.text,
         attachments: [],
         externalMessageId: ev.message.id,
@@ -61,5 +62,16 @@ export class LineAdapter extends BaseAdapter {
     });
     if (!res.ok) throw new Error(`LINE API ${res.status}: ${await res.text()}`);
     return res.headers.get('x-line-request-id') || `line_${Date.now()}`;
+  }
+
+  async fetchProfile(account, participantId) {
+    const token = account?.credential?.accessToken;
+    if (!token || !participantId) return null;
+    const res = await fetch(`https://api.line.me/v2/bot/profile/${participantId}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return { name: d.displayName || null, avatar: d.pictureUrl || null };
   }
 }

@@ -21,6 +21,7 @@ export class MockAdapter extends BaseAdapter {
     return [{
       participantId: body.participantId || `guest_${Date.now()}`,
       participantName: body.participantName || 'Mock Customer',
+      avatar: body.avatar || null,
       text: body.text || '',
       vip: !!body.vip, // lets you exercise VIP/priority routing locally
       attachments: [],
