@@ -3,6 +3,7 @@ import { teamRoster } from './teams.js';
 import { isEligibleForAssignment, roleDef } from './rbac.js';
 import { isAvailable } from './presence.js';
 import { notify } from './notifications.js';
+import { detectProject } from './projects.js';
 import { logger } from '../logger.js';
 
 const log = logger('routing');
@@ -91,6 +92,31 @@ function pickRoundRobin(teamId, roleFilter) {
  */
 export function routeConversation(conversation, { text }) {
   const account = db.channelAccounts.get(conversation.channelAccountId);
+
+  // ── Project detection (from Meta-ads attribution) ────────────────────────
+  // Tag the conversation with its project and, when the project has a sales
+  // team, route there directly (takes priority over channel rules).
+  const project = detectProject(conversation.organizationId, conversation.adReferral);
+  if (project) {
+    db.conversations.update(conversation.id, { project: { id: project.id, code: project.code, name: project.name } });
+    conversation = db.conversations.get(conversation.id);
+    if (project.teamId) {
+      const agent = pickRoundRobin(project.teamId, null);
+      if (agent) {
+        const assignment = assign(conversation, agent.id, ASSIGNMENT_TYPE.ROUND_ROBIN);
+        notify(agent.id, {
+          type: 'assignment',
+          title: 'You have a new conversation',
+          body: `${conversation.customer?.name || 'Customer'} · โครงการ ${project.name}`,
+          conversationId: conversation.id,
+        });
+        return assignment;
+      }
+      notifyTeamSupervisors(project.teamId, conversation, `ลูกค้าโครงการ ${project.name} — ไม่มี agent ออนไลน์`);
+      return null;
+    }
+  }
+
   const ctx = { text, customer: conversation.customer, adReferral: conversation.adReferral };
   const rule = findRule(conversation.channelAccountId, ctx);
 

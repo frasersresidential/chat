@@ -75,6 +75,8 @@ select, input, textarea {
 .chip { font-size: 10px; padding: 1px 7px; border-radius: 20px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
 .chip.vip { background: #3a2d00; color: var(--orange); border-color: var(--orange); }
 .chip.ads { background: #221a45; color: #b3a0ff; border-color: #7c5cff; }
+.chip.project { background: #06281f; color: #4fd1a5; border-color: #1a7a5c; }
+.project-banner { background: #06281f; border: 1px solid #1a7a5c; color: #4fd1a5; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px; }
 .chip.owner { background: #0d2818; color: var(--green); border-color: #1a5c34; }
 .chip.unassigned { background: #3a1212; color: #f1707a; border-color: var(--red); }
 .unread-dot { background: var(--accent); color: #fff; border-radius: 10px; font-size: 10px; padding: 1px 6px; }

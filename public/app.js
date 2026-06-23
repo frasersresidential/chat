@@ -260,6 +260,7 @@ function render() {
   if (state.view === 'teams') return renderTeams(main);
   if (state.view === 'users') return renderUsers(main);
   if (state.view === 'routing') return renderRouting(main);
+  if (state.view === 'projects') return renderProjects(main);
   if (state.view === 'automation') return renderAutomation(main);
   if (state.view === 'broadcast') return renderBroadcast(main);
   if (state.view === 'reports') return renderReports(main);
@@ -343,6 +344,7 @@ async function refreshInbox() {
         <div class="conv-preview">${esc(c.accountName || c.channelLabel)}</div>
         <div class="conv-meta">
           ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
+          ${c.project ? `<span class="chip project">🏢 ${esc(c.project.name)}</span>` : ''}
           ${c.adReferral ? '<span class="chip ads">📣 Ads</span>' : ''}
           ${c.customer?.vip ? '<span class="chip vip">★ VIP</span>' : ''}
           ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
@@ -571,6 +573,7 @@ function renderDetail() {
   const { conversation: c, assignments } = state.thread;
   const editable = can('reply');
   pane.innerHTML = `
+    ${c.project ? `<div class="project-banner">🏢 โครงการ: <b>${esc(c.project.name)}</b></div>` : ''}
     <h4>Customer</h4>
     <div class="row"><span class="muted">Name</span><span>${esc(c.customer?.name)}</span></div>
     <div class="row"><span class="muted">VIP</span><span>${c.customer?.vip ? '★ Yes' : 'No'}</span></div>
@@ -678,6 +681,7 @@ async function renderPipeline(main) {
               </div>
               <div class="kcard-sub">${m.icon || ''} ${esc(c.accountName || c.channelLabel)}</div>
               <div class="kcard-meta">
+                ${c.project ? `<span class="chip project">🏢 ${esc(c.project.name)}</span>` : ''}
                 ${c.adReferral ? '<span class="chip ads">📣</span>' : ''}
                 ${c.customer?.vip ? '<span class="chip vip">★</span>' : ''}
                 ${(c.tags || []).slice(0, 2).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
@@ -937,6 +941,44 @@ async function renderRouting(main) {
   }
 }
 
+// ── Projects ─────────────────────────────────────────────────────────────────────
+async function renderProjects(main) {
+  const [projects, tree] = await Promise.all([api('/projects'), api('/teams')]);
+  const flatTeams = []; const walk = (ns) => ns.forEach((n) => { flatTeams.push(n); walk(n.children || []); });
+  walk(tree);
+  const teamName = (id) => flatTeams.find((t) => t.id === id)?.name || '—';
+  const manage = can('manage_routing');
+  main.innerHTML = `<div class="admin">
+    <h2>Projects (โครงการ)</h2>
+    <p class="muted">ตั้งรหัส/คำที่อยู่ในชื่อ Ad set ของแต่ละโครงการ → ระบบจะติดป้ายโครงการบนแชตอัตโนมัติ และส่งเข้าทีม Sale ของโครงการนั้น</p>
+    <div class="card"><table>
+      <thead><tr><th>โครงการ</th><th>คำในชื่อ Ad set (keywords)</th><th>ทีม Sale</th>${manage ? '<th></th>' : ''}</tr></thead>
+      <tbody>${projects.length ? projects.map((p) => `<tr>
+        <td><span class="chip project">🏢 ${esc(p.name)}</span></td>
+        <td>${(p.keywords || []).map((k) => `<span class="chip">${esc(k)}</span>`).join(' ')}</td>
+        <td>${esc(teamName(p.teamId))}</td>
+        ${manage ? `<td><button class="btn ghost" data-del="${p.id}">✕</button></td>` : ''}
+      </tr>`).join('') : `<tr><td colspan="${manage ? 4 : 3}" class="muted">ยังไม่มีโครงการ</td></tr>`}</tbody>
+    </table></div>
+    ${manage ? `<div class="card"><h3>เพิ่มโครงการ</h3><div class="form-grid">
+      <div><label>ชื่อโครงการ</label><input id="pName" placeholder="เช่น Rhythm รัชดา" /></div>
+      <div><label>คำในชื่อ Ad set (คั่นด้วย ,)</label><input id="pKw" placeholder="RYM,Rhythm,ริทึ่ม" /></div>
+      <div><label>ทีม Sale ของโครงการ</label><select id="pTeam"><option value="">— ไม่ผูกทีม (ติดป้ายอย่างเดียว)</option>${flatTeams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
+      <div><button class="btn" id="pAdd">เพิ่มโครงการ</button></div>
+    </div></div>` : '<p class="muted">ต้องมีสิทธิ์ Manage Routing</p>'}
+  </div>`;
+  if (!manage) return;
+  main.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { await api('/projects/' + b.dataset.del, { method: 'DELETE' }); renderProjects(main); });
+  $('#pAdd').onclick = async () => {
+    try {
+      await api('/projects', { method: 'POST', body: JSON.stringify({
+        name: $('#pName').value, keywords: $('#pKw').value.split(',').map((s) => s.trim()).filter(Boolean), teamId: $('#pTeam').value || null,
+      }) });
+      renderProjects(main);
+    } catch (e) { alert(e.message); }
+  };
+}
+
 // ── Automation / chatbot ─────────────────────────────────────────────────────────
 async function renderAutomation(main) {
   const rules = await api('/auto-replies');
@@ -1131,6 +1173,17 @@ async function renderReports(main) {
           const max = Math.max(1, ...Object.values(a));
           return Object.entries(a).sort((x, y) => y[1] - x[1]).map(([k, v]) => bar(k, v, max, '#7c5cff')).join(''); })()}
       </div>
+    </div>
+
+    <div class="card">
+      <h3>🏢 ผลลัพธ์ต่อโครงการ (Project)</h3>
+      ${(r.projectReport && r.projectReport.length) ? `<table>
+        <thead><tr><th>โครงการ</th><th>แชต</th><th>ปิดได้ (won)</th><th>เสีย (lost)</th><th>Conversion</th><th>รายได้</th></tr></thead>
+        <tbody>${r.projectReport.map((p) => `<tr>
+          <td><span class="chip project">🏢 ${esc(p.project)}</span></td><td>${p.chats}</td><td>${p.won}</td><td>${p.lost}</td>
+          <td><b>${p.conversion}%</b></td><td>฿${(p.revenue || 0).toLocaleString()}</td>
+        </tr>`).join('')}</tbody></table>`
+        : '<p class="muted">ยังไม่มีแชตที่จับคู่โครงการได้ — ตั้งค่าที่แท็บ Projects แล้วให้แชตมาจาก Meta ads ที่มีรหัสโครงการในชื่อ Ad set</p>'}
     </div>
 
     <div class="card">

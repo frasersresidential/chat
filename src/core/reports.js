@@ -73,6 +73,20 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   totals.adsWon = adsWon;
   totals.adsRevenue = adsRevenue;
 
+  // ── Per project (chats / won / lost / revenue / conversion) ───────────────
+  const byProj = {};
+  for (const c of conversations) {
+    if (!c.project) continue;
+    const key = c.project.name;
+    const row = byProj[key] || (byProj[key] = { project: key, chats: 0, won: 0, lost: 0, revenue: 0 });
+    row.chats += 1;
+    if (c.stage === 'won') { row.won += 1; row.revenue += Number(c.dealValue) || 0; }
+    if (c.stage === 'lost') row.lost += 1;
+  }
+  const projectReport = Object.values(byProj)
+    .map((r) => ({ ...r, conversion: r.chats ? +(r.won / r.chats * 100).toFixed(1) : 0 }))
+    .sort((a, b) => b.chats - a.chats);
+
   // ── First response time (inbound → first agent reply) ────────────────────
   const msgsByConv = new Map();
   for (const m of messages) {
@@ -126,7 +140,7 @@ export function buildReport(organizationId, { rangeDays = null } = {}) {
   const assignmentByType = {};
   for (const a of assignments) assignmentByType[a.assignmentType] = (assignmentByType[a.assignmentType] || 0) + 1;
 
-  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, byAdSet, byAd, adRoi, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
+  return { range: rangeDays || 'all', totals, byChannel, byGrade, byStage, byAdSet, byAd, adRoi, projectReport, avgFirstResponseMin, byAgent, volumeByDay, assignmentByType };
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -149,14 +163,14 @@ export function exportConversationsCSV(organizationId, { rangeDays = null } = {}
       const r = c.adReferral || {};
       return [
         c.id, c.customer?.name, c.channel, account?.accountName || '', owner?.name || 'Unassigned',
-        c.grade || '', c.stage || 'new', c.status || 'open', c.customer?.vip ? 'VIP' : '',
-        (c.tags || []).join('|'),
+        c.project?.name || '', c.grade || '', c.stage || 'new', c.status || 'open', c.customer?.vip ? 'VIP' : '',
+        (c.tags || []).join('|'), c.dealValue || '',
         r.adName || r.adTitle || '', r.adsetName || '', r.campaignName || '', r.ref || '',
         c.createdAt, c.lastMessageAt,
       ];
     });
   return toCSV(
-    ['id', 'customer', 'channel', 'account', 'owner', 'grade', 'stage', 'status', 'vip', 'tags',
+    ['id', 'customer', 'channel', 'account', 'owner', 'project', 'grade', 'stage', 'status', 'vip', 'tags', 'deal_value',
       'ad_name', 'ad_set_name', 'campaign_name', 'ad_ref', 'created_at', 'last_message_at'],
     rows,
   );

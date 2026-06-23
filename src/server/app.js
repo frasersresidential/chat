@@ -268,6 +268,33 @@ export function createApp() {
     }
   });
 
+  // ── Projects (ad-set code → name + sales team) ────────────────────────────
+  api.get('/projects', (req, res) => {
+    res.json(db.projects.filter((p) => p.organizationId === req.user.organizationId));
+  });
+  api.post('/projects', requirePerm(PERMISSIONS.MANAGE_ROUTING), (req, res) => {
+    const name = String(req.body.name || '').trim();
+    const keywords = Array.isArray(req.body.keywords) ? req.body.keywords.map((k) => String(k).trim()).filter(Boolean) : [];
+    if (!name || !keywords.length) return res.status(400).json({ error: 'name and at least one keyword required' });
+    if (req.body.teamId && !db.teams.get(req.body.teamId)) return res.status(400).json({ error: 'invalid teamId' });
+    res.status(201).json(db.projects.insert({
+      organizationId: req.user.organizationId, name, code: keywords[0], keywords, teamId: req.body.teamId || null,
+    }));
+  });
+  api.put('/projects/:id', requirePerm(PERMISSIONS.MANAGE_ROUTING), (req, res) => {
+    const p = db.projects.get(req.params.id);
+    if (!p || p.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    const patch = {};
+    if (req.body.name) patch.name = String(req.body.name).trim();
+    if (Array.isArray(req.body.keywords)) { patch.keywords = req.body.keywords.map((k) => String(k).trim()).filter(Boolean); patch.code = patch.keywords[0]; }
+    if (req.body.teamId !== undefined) patch.teamId = req.body.teamId || null;
+    res.json(db.projects.update(p.id, patch));
+  });
+  api.delete('/projects/:id', requirePerm(PERMISSIONS.MANAGE_ROUTING), (req, res) => {
+    db.projects.remove(req.params.id);
+    res.status(204).end();
+  });
+
   // ── Routing rules ─────────────────────────────────────────────────────────
   api.get('/routing-rules', (req, res) => {
     const orgAccounts = new Set(

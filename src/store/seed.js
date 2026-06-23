@@ -122,12 +122,8 @@ export function seedIfEmpty() {
   // LINE After Sales → Support round robin
   rule(db.channelAccounts.get('ca_line_after'), supportTeam.id, 'round_robin', 100, { type: 'always' });
 
-  // Facebook pages
-  // Project routing (priority 1 = runs first): if the Meta-ads Ad set name
-  // contains a project code, send the chat ONLY to that project's sales team.
-  rule(fbA, projRym.id, 'round_robin', 1, { type: 'adset', keywords: ['RYM', 'Rhythm', 'ริทึ่ม'] });
-  rule(fbA, projLpn.id, 'round_robin', 1, { type: 'adset', keywords: ['LPN', 'Lumpini', 'ลุมพินี'] });
-  rule(fbA, teamA.id, 'round_robin', 100, { type: 'always' }); // fallback
+  // Facebook pages (project routing is handled by the Projects below)
+  rule(fbA, teamA.id, 'round_robin', 100, { type: 'always' }); // fallback when no project matches
   rule(db.channelAccounts.get('ca_fb_b'), teamB.id, 'round_robin', 100, { type: 'always' });
   rule(fbSupport, supportTeam.id, 'manual', 100, { type: 'always' }); // manual assignment
 
@@ -149,6 +145,12 @@ export function seedIfEmpty() {
   canned('รอสักครู่', 'รบกวนรอสักครู่นะคะ กำลังตรวจสอบข้อมูลให้ค่ะ', '/wait');
   canned('ขอข้อมูลติดต่อ', 'รบกวนขอชื่อ-เบอร์โทร และที่อยู่สำหรับจัดส่งด้วยนะคะ', '/info');
   canned('ชำระเงิน', 'ชำระผ่านบัญชีธนาคารหรือพร้อมเพย์ได้เลยค่ะ แจ้งสลิปหลังโอนได้เลยนะคะ', '/pay');
+
+  // ── Projects (Ad-set code → project name + sales team) ───────────────────
+  const project = (id, name, keywords, teamId) =>
+    db.projects.insert({ id, organizationId: O, name, code: keywords[0], keywords, teamId });
+  project('proj_rym', 'Rhythm (RYM)', ['RYM', 'Rhythm', 'ริทึ่ม'], projRym.id);
+  project('proj_lpn', 'Lumpini (LPN)', ['LPN', 'Lumpini', 'ลุมพินี'], projLpn.id);
 
   // ── Auto-replies / chatbot ───────────────────────────────────────────────
   const auto = (type, text, keywords = []) =>
