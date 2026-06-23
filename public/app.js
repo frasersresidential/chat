@@ -120,6 +120,7 @@ async function boot() {
   initSound();
   connectWs();
   render();
+  refreshTaskBadge();
 }
 
 async function loadContext() {
@@ -197,6 +198,7 @@ function connectWs() {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 async function refreshNotifications() {
+  refreshTaskBadge();
   state.notifications = await api('/notifications');
   const unread = state.notifications.filter((n) => !n.read).length;
   const badge = $('#notifCount');
@@ -255,6 +257,7 @@ function notifyInbound(message) {
 function render() {
   const main = $('#main');
   if (state.view === 'inbox') return renderInbox(main);
+  if (state.view === 'tasks') return renderTasks(main);
   if (state.view === 'pipeline') return renderPipeline(main);
   if (state.view === 'channels') return renderChannels(main);
   if (state.view === 'teams') return renderTeams(main);
@@ -344,6 +347,7 @@ async function refreshInbox() {
         <div class="conv-preview">${esc(c.accountName || c.channelLabel)}</div>
         <div class="conv-meta">
           ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
+          ${c.reminderAt ? `<span class="chip rem ${new Date(c.reminderAt) < new Date() ? 'overdue' : ''}">⏰</span>` : ''}
           ${c.project ? `<span class="chip project">🏢 ${esc(c.project.name)}</span>` : ''}
           ${c.adReferral ? '<span class="chip ads">📣 Ads</span>' : ''}
           ${c.customer?.vip ? '<span class="chip vip">★ VIP</span>' : ''}
@@ -608,6 +612,27 @@ function renderDetail() {
     <h4>มูลค่าดีล (บาท)</h4>
     <input id="dealInput" type="number" min="0" step="any" value="${c.dealValue || ''}" placeholder="เช่น 2500000" ${editable ? '' : 'disabled'} style="width:100%" />
 
+    <h4>⏰ ตามลูกค้า (Follow-up)</h4>
+    ${(() => {
+      const pend = (state.thread.reminders || []).filter((r) => !r.done);
+      if (!pend.length) return '<div class="muted" style="font-size:12px;margin-bottom:6px">ยังไม่มีรายการเตือน</div>';
+      return pend.map((r) => `<div class="reminder-item ${new Date(r.dueAt) < new Date() ? 'overdue' : ''}">
+        <div><b>${fmtDue(r.dueAt)}</b> ${new Date(r.dueAt) < new Date() ? '<span class="chip unassigned">เลยกำหนด</span>' : ''}</div>
+        <div class="muted" style="font-size:12px">${esc(r.note || 'ติดตามลูกค้า')}</div>
+        ${editable ? `<div style="margin-top:4px"><button class="btn ghost" data-rdone="${r.id}">✓ เสร็จ</button> <button class="btn ghost" data-rdel="${r.id}">✕</button></div>` : ''}
+      </div>`).join('');
+    })()}
+    ${editable ? `<div class="reminder-form">
+      <div class="rem-quick">
+        <button class="btn ghost" data-quick="60">+1 ชม.</button>
+        <button class="btn ghost" data-quick="tomorrow10">พรุ่งนี้ 10:00</button>
+        <button class="btn ghost" data-quick="4320">+3 วัน</button>
+      </div>
+      <input type="datetime-local" id="remWhen" />
+      <input id="remNote" placeholder="โน้ต เช่น โทรตามเรื่องโปรโมชั่น" />
+      <button class="btn" id="remAdd" style="width:100%">+ ตั้งเตือน</button>
+    </div>` : ''}
+
     <h4>Grade (เกรดลูกค้า)</h4>
     <div class="grade-row">
       ${GRADES.map((g) => `<button class="grade-btn grade-${g} ${c.grade === g ? 'active' : ''}" data-grade="${g}" ${editable ? '' : 'disabled'}>${g}</button>`).join('')}
@@ -639,6 +664,23 @@ function renderDetail() {
       state.thread.conversation = updated;
     } catch (e) { alert(e.message); }
   };
+  // Follow-up reminders
+  const addReminder = async (dueAt, note) => {
+    try { await api('/conversations/' + c.id + '/reminders', { method: 'POST', body: JSON.stringify({ dueAt, note }) }); openThread(c.id); refreshTaskBadge(); }
+    catch (e) { alert(e.message); }
+  };
+  $('#remAdd').onclick = () => {
+    if (!$('#remWhen').value) return alert('เลือกวัน/เวลาก่อนค่ะ');
+    addReminder(new Date($('#remWhen').value).toISOString(), $('#remNote').value);
+  };
+  pane.querySelectorAll('[data-quick]').forEach((b) => b.onclick = () => {
+    const d = new Date();
+    if (b.dataset.quick === 'tomorrow10') { d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); }
+    else { d.setMinutes(d.getMinutes() + Number(b.dataset.quick)); }
+    addReminder(d.toISOString(), $('#remNote')?.value || '');
+  });
+  pane.querySelectorAll('[data-rdone]').forEach((b) => b.onclick = async () => { await api('/reminders/' + b.dataset.rdone + '/complete', { method: 'POST' }); openThread(c.id); refreshTaskBadge(); });
+  pane.querySelectorAll('[data-rdel]').forEach((b) => b.onclick = async () => { await api('/reminders/' + b.dataset.rdel, { method: 'DELETE' }); openThread(c.id); refreshTaskBadge(); });
   pane.querySelectorAll('[data-grade]').forEach((b) => b.onclick = async () => {
     try {
       const updated = await api('/conversations/' + c.id + '/grade', { method: 'PUT', body: JSON.stringify({ grade: b.dataset.grade }) });
@@ -656,6 +698,57 @@ function renderDetail() {
   if (ti) ti.onkeydown = (e) => {
     if (e.key === 'Enter' && ti.value.trim()) { e.preventDefault(); saveTags([...(c.tags || []), ti.value.trim()]); }
   };
+}
+
+// ── Tasks / follow-up reminders ────────────────────────────────────────────────────
+function fmtDue(iso) {
+  try { return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch { return iso; }
+}
+async function refreshTaskBadge() {
+  try {
+    const rem = await api('/reminders?scope=mine');
+    const due = rem.filter((r) => !r.done && new Date(r.dueAt) <= new Date()).length;
+    const badge = $('#taskBadge');
+    badge.textContent = due;
+    badge.classList.toggle('hidden', due === 0);
+  } catch { /* ignore */ }
+}
+async function renderTasks(main) {
+  const rem = (await api('/reminders?scope=mine')).filter((r) => !r.done);
+  const now = new Date();
+  const groups = { overdue: [], today: [], upcoming: [] };
+  const endToday = new Date(); endToday.setHours(23, 59, 59, 999);
+  for (const r of rem) {
+    const d = new Date(r.dueAt);
+    if (d < now) groups.overdue.push(r); else if (d <= endToday) groups.today.push(r); else groups.upcoming.push(r);
+  }
+  const section = (title, list, cls) => `
+    <h3 class="${cls}">${title} <span class="kcount">${list.length}</span></h3>
+    ${list.length ? list.map((r) => `<div class="task-row" data-conv="${r.conversationId || ''}">
+      <div class="task-main">
+        <div class="task-cust">${esc(r.conversation?.customer?.name || 'ลูกค้า')} ${r.conversation?.project ? `· 🏢 ${esc(r.conversation.project.name)}` : ''}</div>
+        <div class="muted" style="font-size:12px">${esc(r.note || 'ติดตามลูกค้า')}</div>
+        <div class="task-due">⏰ ${fmtDue(r.dueAt)}</div>
+      </div>
+      <button class="btn ghost" data-done="${r.id}">✓ เสร็จ</button>
+    </div>`).join('') : '<div class="muted" style="padding:6px 0">— ไม่มี —</div>'}`;
+  main.innerHTML = `<div class="admin">
+    <h2>Tasks — ตามลูกค้า (ของฉัน)</h2>
+    <p class="muted">รายการเตือนติดตามลูกค้าที่คุณตั้งไว้ ตั้งเพิ่มได้จากแผงข้อมูลลูกค้าในแต่ละแชต</p>
+    ${section('🔴 เลยกำหนด', groups.overdue, 'task-overdue')}
+    ${section('🟡 วันนี้', groups.today, '')}
+    ${section('🟢 กำลังจะถึง', groups.upcoming, '')}
+  </div>`;
+  main.querySelectorAll('[data-done]').forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    await api('/reminders/' + b.dataset.done + '/complete', { method: 'POST' });
+    renderTasks(main); refreshTaskBadge();
+  });
+  main.querySelectorAll('.task-row[data-conv]').forEach((row) => row.onclick = () => {
+    if (!row.dataset.conv) return;
+    state.view = 'inbox'; state.selectedId = row.dataset.conv; setActiveNav('inbox'); render();
+  });
 }
 
 // ── Sales pipeline (Kanban) ──────────────────────────────────────────────────────

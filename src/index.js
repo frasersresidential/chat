@@ -5,6 +5,7 @@ import { createApp } from './server/app.js';
 import { attachRealtime } from './server/realtime.js';
 import { seedIfEmpty } from './store/seed.js';
 import { applyEnvCredentials } from './store/envCredentials.js';
+import { startReminderScheduler } from './core/reminders.js';
 import { logger } from './logger.js';
 
 const log = logger('boot');
@@ -15,6 +16,7 @@ applyEnvCredentials(); // copy any real keys from .env onto seeded accounts
 const app = createApp();
 const server = http.createServer(app);
 attachRealtime(server);
+startReminderScheduler();
 
 /** First non-internal IPv4 — the address phones on the same Wi-Fi can reach. */
 function lanAddress() {

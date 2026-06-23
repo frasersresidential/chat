@@ -13,6 +13,7 @@ import { listNotifications, markRead as markNotifRead } from '../core/notificati
 import { buildReport, exportConversationsCSV, exportAgentsCSV } from '../core/reports.js';
 import { broadcast, broadcastAudience } from '../core/automation.js';
 import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } from '../core/businessHours.js';
+import { createReminder, listReminders, completeReminder, remindersForConversation } from '../core/reminders.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -347,11 +348,46 @@ export function createApp() {
     if (!thread || thread.conversation.organizationId !== req.user.organizationId) {
       return res.status(404).json({ error: 'not found' });
     }
-    res.json({ ...thread, conversation: decorateConversation(thread.conversation) });
+    res.json({ ...thread, conversation: decorateConversation(thread.conversation), reminders: remindersForConversation(thread.conversation.id) });
   });
 
   api.post('/conversations/:id/read', (req, res) => {
     res.json(markRead(req.params.id));
+  });
+
+  // ── Follow-up reminders / tasks ───────────────────────────────────────────
+  api.get('/reminders', (req, res) => {
+    const enrich = (r) => ({ ...r, conversation: r.conversationId ? decorateConversation(db.conversations.get(r.conversationId)) : null });
+    res.json(listReminders(req.user, req.query.scope || 'mine').map(enrich));
+  });
+
+  api.post('/conversations/:id/reminders', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const conv = db.conversations.get(req.params.id);
+    if (!conv || conv.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    try {
+      const r = createReminder({
+        organizationId: req.user.organizationId,
+        conversationId: conv.id,
+        userId: db.users.get(req.body.userId) ? req.body.userId : (conv.assignedUserId || req.user.id),
+        createdBy: req.user.id,
+        dueAt: req.body.dueAt,
+        note: req.body.note,
+      });
+      res.status(201).json(r);
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  api.post('/reminders/:id/complete', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const r = db.reminders.get(req.params.id);
+    if (!r || r.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    res.json(completeReminder(r.id));
+  });
+
+  api.delete('/reminders/:id', requirePerm(PERMISSIONS.REPLY), (req, res) => {
+    const r = db.reminders.get(req.params.id);
+    if (!r || r.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    db.reminders.remove(r.id);
+    res.status(204).end();
   });
 
   api.post('/conversations/:id/reply', requirePerm(PERMISSIONS.REPLY), async (req, res) => {
@@ -482,13 +518,16 @@ export function createApp() {
 
 /** Attach owner name + channel label so the UI doesn't need extra round-trips. */
 function decorateConversation(c) {
+  if (!c) return null;
   const owner = c.assignedUserId ? db.users.get(c.assignedUserId) : null;
   const account = db.channelAccounts.get(c.channelAccountId);
+  const pending = remindersForConversation(c.id).find((r) => !r.done);
   return {
     ...c,
     assignedUserName: owner?.name || null,
     accountName: account?.accountName || null,
     channelLabel: CHANNEL_META[c.channel]?.label || c.channel,
+    reminderAt: pending?.dueAt || null,
   };
 }
 

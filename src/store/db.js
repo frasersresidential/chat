@@ -30,6 +30,7 @@ const EMPTY = () => ({
   cannedResponses: {},
   autoReplies: {},
   projects: {},
+  reminders: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -99,6 +100,7 @@ export const db = {
   cannedResponses: collection('cannedResponses'),
   autoReplies: collection('autoReplies'),
   projects: collection('projects'),
+  reminders: collection('reminders'),
 
   /** Round-robin cursor accessors (kept outside generic CRUD on purpose). */
   getCursor(key) {
