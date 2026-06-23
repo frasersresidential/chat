@@ -124,9 +124,10 @@ export async function sendReply(conversationId, user, text, attachments = []) {
   const updated = db.conversations.update(conversationId, {
     lastMessageAt: message.createdAt,
     unread: 0,
-    // A human replied → stop the SLA clock and clear any breach flag.
+    // A human replied → stop the SLA clock and reset the breach/reassign state.
     waitingSince: null,
     slaBreachedAt: null,
+    slaReassignCount: 0,
   });
 
   bus.emit('conversation:upserted', updated);

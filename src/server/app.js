@@ -300,6 +300,7 @@ export function createApp() {
       enabled: !!req.body.enabled,
       minutes: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : cur.minutes,
       escalate: req.body.escalate !== undefined ? !!req.body.escalate : cur.escalate,
+      reassign: req.body.reassign !== undefined ? !!req.body.reassign : (cur.reassign !== false),
     };
     db.organizations.update(org.id, { sla: cfg });
     res.json(cfg);

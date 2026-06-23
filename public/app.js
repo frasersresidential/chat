@@ -1106,6 +1106,7 @@ async function renderAutomation(main) {
       <div class="form-grid">
         <div><label>เปิดใช้งาน</label><br/><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="slaEnabled" ${sla.enabled ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิด</label></div>
         <div><label>ค้างตอบเกิน (นาที)</label><input type="number" id="slaMin" min="1" value="${sla.minutes}" ${manage ? '' : 'disabled'}/></div>
+        <div><label>Round Robin หา agent คนอื่นในโครงการ</label><br/><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="slaReassign" ${sla.reassign !== false ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิด</label></div>
         <div><label>Escalate หาหัวหน้า</label><br/><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="slaEsc" ${sla.escalate ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิด</label></div>
         ${manage ? '<div><button class="btn" id="slaSave">บันทึก SLA</button></div>' : ''}
       </div>
@@ -1131,7 +1132,7 @@ async function renderAutomation(main) {
   </div>`;
   if (!manage) return;
   $('#slaSave').onclick = async () => {
-    try { await api('/sla', { method: 'PUT', body: JSON.stringify({ enabled: $('#slaEnabled').checked, minutes: Number($('#slaMin').value), escalate: $('#slaEsc').checked }) }); renderAutomation(main); }
+    try { await api('/sla', { method: 'PUT', body: JSON.stringify({ enabled: $('#slaEnabled').checked, minutes: Number($('#slaMin').value), escalate: $('#slaEsc').checked, reassign: $('#slaReassign').checked }) }); renderAutomation(main); }
     catch (e) { alert(e.message); }
   };
   $('#bhSave').onclick = async () => {

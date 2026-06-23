@@ -60,8 +60,9 @@ export function findRule(channelAccountId, ctx) {
  * cursor. Scans forward from the cursor so offline/busy agents are skipped
  * while overall rotation stays fair. Returns null if nobody is available.
  */
-function pickRoundRobin(teamId, roleFilter) {
-  const active = (u) => u.status !== 'disabled';
+function pickRoundRobin(teamId, roleFilter, opts = {}) {
+  const { excludeUserId = null, cursorKey = null } = opts;
+  const active = (u) => u.status !== 'disabled' && (!excludeUserId || u.id !== excludeUserId);
   const roster = teamRoster(teamId).filter((u) => {
     const targetRole = roleFilter || null;
     const eligible = targetRole ? u.role === targetRole : isEligibleForAssignment(u);
@@ -73,7 +74,7 @@ function pickRoundRobin(teamId, roleFilter) {
   );
   if (roster.length === 0) return null;
 
-  const key = `${teamId}:${roleFilter || 'eligible'}`;
+  const key = cursorKey || `${teamId}:${roleFilter || 'eligible'}`;
   const cursor = db.getCursor(key);
   for (let step = 1; step <= fullRoster.length; step++) {
     const idx = (cursor + step) % fullRoster.length;
@@ -171,6 +172,24 @@ export function assign(conversation, userId, assignmentType) {
     teamId: conversation.teamId || null,
   });
   return assignment;
+}
+
+/**
+ * Round-robin reassign to another available agent on a team, excluding the
+ * current owner (used by the SLA monitor). Returns the new agent or null.
+ */
+export function reassignWithinTeam(conversation, teamId, excludeUserId) {
+  const agent = pickRoundRobin(teamId, null, { excludeUserId, cursorKey: `${teamId}:sla` });
+  if (!agent) return null;
+  db.assignments.insert({
+    conversationId: conversation.id,
+    assignedUserId: agent.id,
+    assignedAt: new Date().toISOString(),
+    assignmentType: ASSIGNMENT_TYPE.ROUND_ROBIN,
+    reason: 'sla_reassign',
+  });
+  db.conversations.update(conversation.id, { assignedUserId: agent.id });
+  return agent;
 }
 
 /** Manager/Supervisor takeover or transfer — history is always preserved. */
