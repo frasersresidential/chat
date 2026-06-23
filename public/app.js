@@ -980,13 +980,30 @@ async function renderProjects(main) {
 }
 
 // ── Automation / chatbot ─────────────────────────────────────────────────────────
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_LABEL = { mon: 'จันทร์', tue: 'อังคาร', wed: 'พุธ', thu: 'พฤหัส', fri: 'ศุกร์', sat: 'เสาร์', sun: 'อาทิตย์' };
 async function renderAutomation(main) {
-  const rules = await api('/auto-replies');
+  const [rules, bh] = await Promise.all([api('/auto-replies'), api('/business-hours')]);
   const manage = can('manage_automation');
-  const TYPE_LABEL = { welcome: '👋 ข้อความต้อนรับ (แชตใหม่)', away: '🌙 ตอบนอกเวลา (ไม่มี agent online)', keyword: '🔑 ตอบตามคีย์เวิร์ด' };
+  const TYPE_LABEL = { welcome: '👋 ข้อความต้อนรับ (แชตใหม่)', away: '🌙 ตอบนอกเวลาทำการ', keyword: '🔑 ตอบตามคีย์เวิร์ด' };
   main.innerHTML = `<div class="admin">
     <h2>Automation / Chatbot</h2>
-    <p class="muted">ตอบลูกค้าอัตโนมัติ: ข้อความต้อนรับเมื่อมีแชตใหม่, ตอบเมื่อไม่มี agent ออนไลน์, และตอบ FAQ ตามคีย์เวิร์ด</p>
+    <p class="muted">ตอบลูกค้าอัตโนมัติ: ข้อความต้อนรับเมื่อมีแชตใหม่, ตอบนอกเวลาทำการ, และตอบ FAQ ตามคีย์เวิร์ด</p>
+
+    <div class="card">
+      <h3>🕐 เวลาทำการ (Business Hours) ${bh.openNow ? '<span class="pill role-agent">● เปิดอยู่</span>' : '<span class="pill">○ นอกเวลา</span>'}</h3>
+      <p class="muted">นอกเวลาทำการ ระบบจะส่งข้อความ "ตอบนอกเวลาทำการ" (กฎ away ด้านล่าง) ให้ลูกค้าอัตโนมัติ</p>
+      <label style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="bhEnabled" ${bh.enabled ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิดใช้งานเวลาทำการ</label>
+      <div style="margin:10px 0"><label class="muted" style="font-size:12px">Timezone</label><br/><input id="bhTz" value="${esc(bh.timezone)}" ${manage ? '' : 'disabled'} style="width:220px" /></div>
+      <table><thead><tr><th>วัน</th><th>หยุด</th><th>เวลาเปิด</th><th>เวลาปิด</th></tr></thead>
+      <tbody>${DAY_KEYS.map((k) => { const d = bh.days[k] || {}; return `<tr data-day="${k}">
+        <td>${DAY_LABEL[k]}</td>
+        <td><input type="checkbox" class="bhClosed" ${d.closed ? 'checked' : ''} ${manage ? '' : 'disabled'}/></td>
+        <td><input type="time" class="bhOpen" value="${d.open || '09:00'}" ${manage ? '' : 'disabled'}/></td>
+        <td><input type="time" class="bhClose" value="${d.close || '18:00'}" ${manage ? '' : 'disabled'}/></td>
+      </tr>`; }).join('')}</tbody></table>
+      ${manage ? '<button class="btn" id="bhSave" style="margin-top:10px">บันทึกเวลาทำการ</button>' : ''}
+    </div>
     <div class="card"><table>
       <thead><tr><th>ประเภท</th><th>คีย์เวิร์ด</th><th>ข้อความ</th><th>สถานะ</th>${manage ? '<th></th>' : ''}</tr></thead>
       <tbody>${rules.length ? rules.map((r) => `<tr>
@@ -1007,6 +1024,20 @@ async function renderAutomation(main) {
     </div></div>` : '<p class="muted">ต้องมีสิทธิ์ Manage Automation</p>'}
   </div>`;
   if (!manage) return;
+  $('#bhSave').onclick = async () => {
+    const days = {};
+    main.querySelectorAll('tr[data-day]').forEach((tr) => {
+      days[tr.dataset.day] = {
+        closed: tr.querySelector('.bhClosed').checked,
+        open: tr.querySelector('.bhOpen').value || '09:00',
+        close: tr.querySelector('.bhClose').value || '18:00',
+      };
+    });
+    try {
+      await api('/business-hours', { method: 'PUT', body: JSON.stringify({ enabled: $('#bhEnabled').checked, timezone: $('#bhTz').value.trim(), days }) });
+      renderAutomation(main);
+    } catch (e) { alert(e.message); }
+  };
   main.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => { await api('/auto-replies/' + b.dataset.toggle, { method: 'PUT', body: JSON.stringify({ enabled: b.dataset.next === 'true' }) }); renderAutomation(main); });
   main.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { await api('/auto-replies/' + b.dataset.del, { method: 'DELETE' }); renderAutomation(main); });
   $('#arAdd').onclick = async () => {

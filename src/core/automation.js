@@ -3,6 +3,7 @@ import { bus } from './eventBus.js';
 import { getAdapter } from '../channels/registry.js';
 import { isAvailable } from './presence.js';
 import { isEligibleForAssignment } from './rbac.js';
+import { isOutsideBusinessHours } from './businessHours.js';
 import { logger } from '../logger.js';
 
 const log = logger('automation');
@@ -46,9 +47,14 @@ export async function runAutoReplies({ account, conversation, text, isNew }) {
     const toSend = [];
 
     if (isNew) {
-      if (!anyAgentOnline(account.organizationId)) {
-        const away = rules.find((r) => r.type === 'away');
-        if (away) toSend.push(away.text);
+      // "Away" fires outside business hours when configured; otherwise it falls
+      // back to "no sales agent is online".
+      const org = db.organizations.get(account.organizationId);
+      const bh = org?.businessHours;
+      const away = (bh && bh.enabled) ? isOutsideBusinessHours(bh) : !anyAgentOnline(account.organizationId);
+      if (away) {
+        const rule = rules.find((r) => r.type === 'away');
+        if (rule) toSend.push(rule.text);
       }
       const welcome = rules.find((r) => r.type === 'welcome');
       if (welcome && !toSend.length) toSend.push(welcome.text);

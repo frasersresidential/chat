@@ -12,6 +12,7 @@ import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
 import { buildReport, exportConversationsCSV, exportAgentsCSV } from '../core/reports.js';
 import { broadcast, broadcastAudience } from '../core/automation.js';
+import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } from '../core/businessHours.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -252,6 +253,19 @@ export function createApp() {
   api.delete('/auto-replies/:id', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
     db.autoReplies.remove(req.params.id);
     res.status(204).end();
+  });
+
+  // ── Business hours ────────────────────────────────────────────────────────
+  api.get('/business-hours', (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    const bh = org?.businessHours || defaultBusinessHours();
+    res.json({ ...bh, openNow: isWithinBusinessHours(bh) });
+  });
+  api.put('/business-hours', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    const bh = sanitizeBusinessHours(req.body, org?.businessHours || defaultBusinessHours());
+    db.organizations.update(org.id, { businessHours: bh });
+    res.json({ ...bh, openNow: isWithinBusinessHours(bh) });
   });
 
   // ── Broadcast ─────────────────────────────────────────────────────────────

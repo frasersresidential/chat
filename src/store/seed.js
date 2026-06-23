@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { PRESENCE } from '../core/presence.js';
 import { hashPassword } from '../core/auth.js';
+import { defaultBusinessHours } from '../core/businessHours.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
@@ -17,7 +18,7 @@ export function seedIfEmpty() {
   if (!db.isEmpty()) return;
   log.info('seeding demo organization "Company A"...');
 
-  const org = db.organizations.insert({ id: 'org_company_a', name: 'Company A' });
+  const org = db.organizations.insert({ id: 'org_company_a', name: 'Company A', businessHours: defaultBusinessHours() });
   const O = org.id;
 
   // ── Teams (hierarchy) ─────────────────────────────────────────────────────
