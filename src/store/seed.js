@@ -28,6 +28,10 @@ export function seedIfEmpty() {
   const luxuryTeam = db.teams.insert({ id: 'team_luxury', organizationId: O, name: 'Luxury Sales Team', parentId: salesDept.id });
   const supportTeam = db.teams.insert({ id: 'team_support', organizationId: O, name: 'Support Team', parentId: null });
   const marketingTeam = db.teams.insert({ id: 'team_marketing', organizationId: O, name: 'Marketing Team', parentId: null });
+  // Project sales teams — chats from Meta ads whose Ad set name contains the
+  // project code are routed here (see the 'adset' routing rules below).
+  const projRym = db.teams.insert({ id: 'team_proj_rym', organizationId: O, name: 'Sales โครงการ Rhythm (RYM)', parentId: salesDept.id, skills: ['rym'] });
+  const projLpn = db.teams.insert({ id: 'team_proj_lpn', organizationId: O, name: 'Sales โครงการ Lumpini (LPN)', parentId: salesDept.id, skills: ['lpn'] });
 
   // ── Users (every role) ────────────────────────────────────────────────────
   const demoHash = hashPassword(config.demoPassword);
@@ -63,6 +67,10 @@ export function seedIfEmpty() {
   member(supportTeam, support1, 'agent');
   member(supportTeam, support2, 'agent');
   member(marketingTeam, mkt1, 'agent');
+  // Project sales reps (an agent can belong to several teams)
+  member(projRym, sales1, 'agent');
+  member(projRym, senior1, 'agent');
+  member(projLpn, sales3, 'agent');
 
   // ── Channel accounts (multiple per channel) ───────────────────────────────
   // credential is intentionally empty → adapters run in "simulated" mode so the
@@ -115,7 +123,11 @@ export function seedIfEmpty() {
   rule(db.channelAccounts.get('ca_line_after'), supportTeam.id, 'round_robin', 100, { type: 'always' });
 
   // Facebook pages
-  rule(fbA, teamA.id, 'round_robin', 100, { type: 'always' });
+  // Project routing (priority 1 = runs first): if the Meta-ads Ad set name
+  // contains a project code, send the chat ONLY to that project's sales team.
+  rule(fbA, projRym.id, 'round_robin', 1, { type: 'adset', keywords: ['RYM', 'Rhythm', 'ริทึ่ม'] });
+  rule(fbA, projLpn.id, 'round_robin', 1, { type: 'adset', keywords: ['LPN', 'Lumpini', 'ลุมพินี'] });
+  rule(fbA, teamA.id, 'round_robin', 100, { type: 'always' }); // fallback
   rule(db.channelAccounts.get('ca_fb_b'), teamB.id, 'round_robin', 100, { type: 'always' });
   rule(fbSupport, supportTeam.id, 'manual', 100, { type: 'always' }); // manual assignment
 

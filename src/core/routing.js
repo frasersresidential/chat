@@ -27,12 +27,20 @@ export const ASSIGNMENT_TYPE = {
  *     assignToRole?: 'supervisor'|'agent'|...  // override target role }
  */
 
-function ruleMatches(rule, { text, customer }) {
+function ruleMatches(rule, { text, customer, adReferral }) {
   const cond = rule.condition || { type: 'always' };
   if (cond.type === 'always') return true;
   if (cond.type === 'vip') return !!customer?.vip;
   if (cond.type === 'keyword') {
     const hay = (text || '').toLowerCase();
+    return (cond.keywords || []).some((k) => hay.includes(k.toLowerCase()));
+  }
+  // Project routing: match a code/abbreviation inside the Meta-ads attribution
+  // (Ad set name first, then ad/campaign/utm) → send to that project's team.
+  if (cond.type === 'adset') {
+    if (!adReferral) return false;
+    const hay = [adReferral.adsetName, adReferral.adName, adReferral.adTitle, adReferral.campaignName, adReferral.utm?.campaign]
+      .filter(Boolean).join(' ').toLowerCase();
     return (cond.keywords || []).some((k) => hay.includes(k.toLowerCase()));
   }
   return false;
@@ -83,7 +91,7 @@ function pickRoundRobin(teamId, roleFilter) {
  */
 export function routeConversation(conversation, { text }) {
   const account = db.channelAccounts.get(conversation.channelAccountId);
-  const ctx = { text, customer: conversation.customer };
+  const ctx = { text, customer: conversation.customer, adReferral: conversation.adReferral };
   const rule = findRule(conversation.channelAccountId, ctx);
 
   if (!rule) {

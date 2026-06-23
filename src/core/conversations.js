@@ -41,7 +41,6 @@ export function ingestInbound(account, inbound) {
     });
     log.info(`new conversation ${conversation.id} on ${account.accountName}`
       + (inbound.referral ? ` [from ad ${inbound.referral.adId || inbound.referral.ref || ''}]` : ''));
-    if (inbound.referral) enrichAdReferralAsync(account, conversation);
   }
 
   const message = db.messages.insert({
@@ -63,8 +62,18 @@ export function ingestInbound(account, inbound) {
 
   // Only route brand-new conversations (don't reassign an active thread).
   if (isNew) {
-    routeConversation(conversation, { text: inbound.text });
-    conversation = db.conversations.get(conversation.id);
+    const r = conversation.adReferral;
+    // Real Meta ads only give us ad_id — the Ad set name (used by project
+    // routing rules) must be fetched from the Graph API first. In that case
+    // defer routing until enrichment completes; otherwise route immediately.
+    const needsAdsetEnrich = !!(r && r.adId && !r.adsetName && account?.credential?.accessToken);
+    if (needsAdsetEnrich) {
+      enrichThenRoute(account, conversation.id, inbound.text);
+    } else {
+      if (r) enrichAdReferralAsync(account, conversation); // best-effort name fill (non-blocking)
+      routeConversation(conversation, { text: inbound.text });
+      conversation = db.conversations.get(conversation.id);
+    }
   }
 
   bus.emit('conversation:upserted', conversation);
@@ -73,6 +82,15 @@ export function ingestInbound(account, inbound) {
   // Fire auto-replies asynchronously so ingestion stays fast.
   runAutoReplies({ account, conversation, text: inbound.text, isNew });
   return { conversation, message };
+}
+
+/** Enrich a Meta-ads conversation (resolve Ad set name) then route it. */
+async function enrichThenRoute(account, conversationId, text) {
+  await enrichAdReferralAsync(account, db.conversations.get(conversationId));
+  const conv = db.conversations.get(conversationId);
+  if (!conv) return;
+  routeConversation(conv, { text });
+  bus.emit('conversation:upserted', db.conversations.get(conversationId));
 }
 
 /** Agent/manager sends an outbound reply through the originating channel. */

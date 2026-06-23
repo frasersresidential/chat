@@ -913,8 +913,8 @@ async function renderRouting(main) {
       <div><label>Channel account</label><select id="rAcc">${accounts.map((a) => `<option value="${a.id}">${esc(a.accountName)}</option>`).join('')}</select></div>
       <div><label>Team</label><select id="rTeam">${flatTeams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
       <div><label>Routing type</label><select id="rType"><option value="round_robin">round_robin</option><option value="manual">manual</option></select></div>
-      <div><label>Condition</label><select id="rCond"><option value="always">always</option><option value="vip">vip</option><option value="keyword">keyword</option></select></div>
-      <div><label>Keywords (csv)</label><input id="rKw" placeholder="refund,complaint" /></div>
+      <div><label>Condition</label><select id="rCond"><option value="always">always</option><option value="vip">vip</option><option value="keyword">keyword (ข้อความ)</option><option value="adset">adset (รหัสโครงการในชื่อ Ad set)</option></select></div>
+      <div><label>Keywords / รหัสโครงการ (csv)</label><input id="rKw" placeholder="RYM,Rhythm  หรือ  refund,ร้องเรียน" /></div>
       <div><label>Priority</label><input id="rPrio" type="number" value="100" /></div>
       <div><button class="btn" id="rAdd">Add rule</button></div>
     </div></div>` : ''}
@@ -923,7 +923,9 @@ async function renderRouting(main) {
     main.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { await api('/routing-rules/' + b.dataset.del, { method: 'DELETE' }); renderRouting(main); });
     $('#rAdd').onclick = async () => {
       const cond = $('#rCond').value;
-      const condition = cond === 'keyword' ? { type: 'keyword', keywords: $('#rKw').value.split(',').map((s) => s.trim()).filter(Boolean) } : { type: cond };
+      const condition = (cond === 'keyword' || cond === 'adset')
+        ? { type: cond, keywords: $('#rKw').value.split(',').map((s) => s.trim()).filter(Boolean) }
+        : { type: cond };
       try {
         await api('/routing-rules', { method: 'POST', body: JSON.stringify({
           channelAccountId: $('#rAcc').value, teamId: $('#rTeam').value, routingType: $('#rType').value,
