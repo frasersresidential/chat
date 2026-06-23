@@ -5,7 +5,7 @@ services:
     name: omnichat
     runtime: node
     plan: free
-    branch: claude/relaxed-gauss-s9wp05
+    branch: main
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
