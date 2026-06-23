@@ -939,7 +939,7 @@ async function renderUsers(main) {
     <h2>Users, Access & Permissions</h2>
     <p class="muted">Invite people, set their role (which decides their permissions) and revoke access. Disabled users keep their history but can't sign in or receive chats.</p>
     <div class="card"><table>
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Presence</th><th>Access</th><th>Assignable</th>${manage ? '<th></th>' : ''}</tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Presence</th><th>แชตค้าง</th><th>Access</th><th>Assignable</th>${manage ? '<th></th>' : ''}</tr></thead>
       <tbody>${users.map((u) => {
         const role = state.meta.roles[u.role] || {};
         const status = u.status || 'active';
@@ -950,9 +950,11 @@ async function renderUsers(main) {
             ? `<select data-role-for="${u.id}">${roleOptions(u.role)}</select>`
             : `<span class="pill role-${u.role}">${esc(role.label || u.role)}</span>`}</td>
           <td><span class="dot ${u.presence}"></span>${u.presence}</td>
+          <td>${u.activeChats ? `<b>${u.activeChats}</b>` : '0'}</td>
           <td><span class="pill ${status === 'active' ? 'role-agent' : ''}">${status}</span></td>
           <td>${role.eligibleForAssignment ? '✅ round robin' : '— observer/manager'}</td>
           ${manage ? `<td style="white-space:nowrap">
+            ${u.activeChats ? `<button class="btn ghost" data-handover="${u.id}">โอนแชต (${u.activeChats})</button>` : ''}
             <button class="btn ghost" data-status="${u.id}" data-next="${status === 'disabled' ? 'active' : 'disabled'}">${status === 'disabled' ? 'Enable' : 'Disable'}</button>
           </td>` : ''}
         </tr>`;
@@ -977,8 +979,20 @@ async function renderUsers(main) {
     catch (e) { alert(e.message); }
   });
   main.querySelectorAll('[data-status]').forEach((b) => b.onclick = async () => {
-    try { await api('/users/' + b.dataset.status, { method: 'PUT', body: JSON.stringify({ status: b.dataset.next }) }); renderUsers(main); }
-    catch (e) { alert(e.message); }
+    if (b.dataset.next === 'disabled' && !confirm('ปิดสิทธิ์ผู้ใช้นี้? แชตที่ค้างอยู่จะถูกโอนให้ agent คนอื่นในโครงการอัตโนมัติ')) return;
+    try {
+      const res = await api('/users/' + b.dataset.status, { method: 'PUT', body: JSON.stringify({ status: b.dataset.next }) });
+      if (res.handover) alert(`โอนแชตเรียบร้อย: ส่งต่อ ${res.handover.reassigned} ราย, ไม่มีผู้ดูแล ${res.handover.unassigned} ราย (จาก ${res.handover.total})`);
+      renderUsers(main);
+    } catch (e) { alert(e.message); }
+  });
+  main.querySelectorAll('[data-handover]').forEach((b) => b.onclick = async () => {
+    if (!confirm('โอนแชตที่ค้างของผู้ใช้นี้ไปให้ agent คนอื่นในโครงการ?')) return;
+    try {
+      const r = await api('/users/' + b.dataset.handover + '/handover', { method: 'POST', body: JSON.stringify({}) });
+      alert(`โอนแล้ว: ส่งต่อ ${r.reassigned} ราย, ไม่มีผู้ดูแล ${r.unassigned} ราย (จาก ${r.total})`);
+      renderUsers(main);
+    } catch (e) { alert(e.message); }
   });
 }
 

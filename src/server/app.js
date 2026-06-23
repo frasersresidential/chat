@@ -16,6 +16,7 @@ import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } fr
 import { createReminder, listReminders, completeReminder, remindersForConversation } from '../core/reminders.js';
 import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../core/dailyReport.js';
 import { defaultSla } from '../core/sla.js';
+import { handoverUserConversations } from '../core/handover.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -109,7 +110,10 @@ export function createApp() {
   });
 
   api.get('/users', (req, res) => {
-    res.json(db.users.filter((u) => u.organizationId === req.user.organizationId).map(publicUser));
+    res.json(db.users.filter((u) => u.organizationId === req.user.organizationId).map((u) => ({
+      ...publicUser(u),
+      activeChats: db.conversations.filter((c) => c.assignedUserId === u.id && c.status !== 'resolved').length,
+    })));
   });
 
   api.post('/users', requirePerm(PERMISSIONS.MANAGE_USERS), (req, res) => {
@@ -138,7 +142,25 @@ export function createApp() {
     if (req.body.status && ['active', 'invited', 'disabled'].includes(req.body.status)) {
       patch.status = req.body.status;
     }
-    res.json(publicUser(db.users.update(target.id, patch)));
+    const wasDisabled = target.status === 'disabled';
+    const updated = db.users.update(target.id, patch);
+    // Offboarding: when an agent is disabled, redistribute their open chats.
+    let handover = null;
+    if (patch.status === 'disabled' && !wasDisabled) {
+      handover = handoverUserConversations(target.id, { byUserId: req.user.id });
+    }
+    res.json({ ...publicUser(updated), handover });
+  });
+
+  // Manually redistribute a user's open conversations (resign / move team).
+  api.post('/users/:id/handover', requirePerm(PERMISSIONS.MANAGE_USERS), (req, res) => {
+    const target = db.users.get(req.params.id);
+    if (!target || target.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    res.json(handoverUserConversations(target.id, {
+      toUserId: req.body.toUserId || null,
+      toTeamId: req.body.toTeamId || null,
+      byUserId: req.user.id,
+    }));
   });
 
   api.put('/me/presence', (req, res) => {
