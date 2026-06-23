@@ -20,6 +20,7 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const waitedMin = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso)) / 60000));
 const timeAgo = (iso) => {
   const d = (Date.now() - new Date(iso)) / 1000;
   if (d < 60) return 'just now';
@@ -347,6 +348,7 @@ async function refreshInbox() {
         <div class="conv-preview">${esc(c.accountName || c.channelLabel)}</div>
         <div class="conv-meta">
           ${c.grade ? `<span class="grade-mini grade-${c.grade}">${c.grade}</span>` : ''}
+          ${c.waitingSince ? `<span class="chip ${c.slaBreachedAt ? 'sla-breach' : 'waiting'}">${c.slaBreachedAt ? '🔴 SLA' : '⏳ ' + waitedMin(c.waitingSince) + 'm'}</span>` : ''}
           ${c.reminderAt ? `<span class="chip rem ${new Date(c.reminderAt) < new Date() ? 'overdue' : ''}">⏰</span>` : ''}
           ${c.project ? `<span class="chip project">🏢 ${esc(c.project.name)}</span>` : ''}
           ${c.adReferral ? '<span class="chip ads">📣 Ads</span>' : ''}
@@ -1076,7 +1078,7 @@ async function renderProjects(main) {
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABEL = { mon: 'จันทร์', tue: 'อังคาร', wed: 'พุธ', thu: 'พฤหัส', fri: 'ศุกร์', sat: 'เสาร์', sun: 'อาทิตย์' };
 async function renderAutomation(main) {
-  const [rules, bh] = await Promise.all([api('/auto-replies'), api('/business-hours')]);
+  const [rules, bh, sla] = await Promise.all([api('/auto-replies'), api('/business-hours'), api('/sla')]);
   const manage = can('manage_automation');
   const TYPE_LABEL = { welcome: '👋 ข้อความต้อนรับ (แชตใหม่)', away: '🌙 ตอบนอกเวลาทำการ', keyword: '🔑 ตอบตามคีย์เวิร์ด' };
   main.innerHTML = `<div class="admin">
@@ -1096,6 +1098,17 @@ async function renderAutomation(main) {
         <td><input type="time" class="bhClose" value="${d.close || '18:00'}" ${manage ? '' : 'disabled'}/></td>
       </tr>`; }).join('')}</tbody></table>
       ${manage ? '<button class="btn" id="bhSave" style="margin-top:10px">บันทึกเวลาทำการ</button>' : ''}
+    </div>
+
+    <div class="card">
+      <h3>⏱️ SLA — แจ้งเตือนแชตค้างตอบ (เรียลไทม์)</h3>
+      <p class="muted">ลูกค้ารอเกินเวลาที่ตั้งโดยยังไม่มีคนตอบ → เด้งเตือน sales เจ้าของ และ escalate หา supervisor/manager ทันที</p>
+      <div class="form-grid">
+        <div><label>เปิดใช้งาน</label><br/><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="slaEnabled" ${sla.enabled ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิด</label></div>
+        <div><label>ค้างตอบเกิน (นาที)</label><input type="number" id="slaMin" min="1" value="${sla.minutes}" ${manage ? '' : 'disabled'}/></div>
+        <div><label>Escalate หาหัวหน้า</label><br/><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="slaEsc" ${sla.escalate ? 'checked' : ''} ${manage ? '' : 'disabled'}/> เปิด</label></div>
+        ${manage ? '<div><button class="btn" id="slaSave">บันทึก SLA</button></div>' : ''}
+      </div>
     </div>
     <div class="card"><table>
       <thead><tr><th>ประเภท</th><th>คีย์เวิร์ด</th><th>ข้อความ</th><th>สถานะ</th>${manage ? '<th></th>' : ''}</tr></thead>
@@ -1117,6 +1130,10 @@ async function renderAutomation(main) {
     </div></div>` : '<p class="muted">ต้องมีสิทธิ์ Manage Automation</p>'}
   </div>`;
   if (!manage) return;
+  $('#slaSave').onclick = async () => {
+    try { await api('/sla', { method: 'PUT', body: JSON.stringify({ enabled: $('#slaEnabled').checked, minutes: Number($('#slaMin').value), escalate: $('#slaEsc').checked }) }); renderAutomation(main); }
+    catch (e) { alert(e.message); }
+  };
   $('#bhSave').onclick = async () => {
     const days = {};
     main.querySelectorAll('tr[data-day]').forEach((tr) => {

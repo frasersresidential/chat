@@ -15,6 +15,7 @@ import { broadcast, broadcastAudience } from '../core/automation.js';
 import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } from '../core/businessHours.js';
 import { createReminder, listReminders, completeReminder, remindersForConversation } from '../core/reminders.js';
 import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../core/dailyReport.js';
+import { defaultSla } from '../core/sla.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -286,6 +287,24 @@ export function createApp() {
   });
 
   // ── Business hours ────────────────────────────────────────────────────────
+  // ── SLA (real-time pending alerts) ────────────────────────────────────────
+  api.get('/sla', (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    res.json(org?.sla || defaultSla());
+  });
+  api.put('/sla', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const org = db.organizations.get(req.user.organizationId);
+    const cur = org?.sla || defaultSla();
+    const minutes = Number(req.body.minutes);
+    const cfg = {
+      enabled: !!req.body.enabled,
+      minutes: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : cur.minutes,
+      escalate: req.body.escalate !== undefined ? !!req.body.escalate : cur.escalate,
+    };
+    db.organizations.update(org.id, { sla: cfg });
+    res.json(cfg);
+  });
+
   api.get('/business-hours', (req, res) => {
     const org = db.organizations.get(req.user.organizationId);
     const bh = org?.businessHours || defaultBusinessHours();
@@ -557,6 +576,8 @@ function decorateConversation(c) {
     accountName: account?.accountName || null,
     channelLabel: CHANNEL_META[c.channel]?.label || c.channel,
     reminderAt: pending?.dueAt || null,
+    waitingSince: c.waitingSince || null,
+    slaBreachedAt: c.slaBreachedAt || null,
   };
 }
 

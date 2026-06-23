@@ -58,6 +58,8 @@ export function ingestInbound(account, inbound) {
     lastMessageAt: inbound.timestamp,
     unread: (conversation.unread || 0) + 1,
     status: 'open',
+    // Start the "waiting for a human reply" clock (for SLA) if not already ticking.
+    waitingSince: conversation.waitingSince || inbound.timestamp,
   });
 
   // Only route brand-new conversations (don't reassign an active thread).
@@ -122,6 +124,9 @@ export async function sendReply(conversationId, user, text, attachments = []) {
   const updated = db.conversations.update(conversationId, {
     lastMessageAt: message.createdAt,
     unread: 0,
+    // A human replied → stop the SLA clock and clear any breach flag.
+    waitingSince: null,
+    slaBreachedAt: null,
   });
 
   bus.emit('conversation:upserted', updated);

@@ -250,6 +250,8 @@ code.hookurl { cursor: pointer; font-size: 11px; color: var(--accent); word-brea
 .reminder-form input { width: 100%; }
 .rem-quick { display: flex; gap: 5px; flex-wrap: wrap; }
 .rem-quick .btn { font-size: 12px; padding: 5px 8px; }
+.chip.waiting { background: #2a2410; color: #e0b341; border-color: #7a6320; }
+.chip.sla-breach { background: #3a1212; color: #f1707a; border-color: var(--red); font-weight: 600; }
 .chip.rem { background: #1a2a3a; color: #6fb3f7; border-color: #2f6fb0; }
 .chip.rem.overdue { background: #3a1212; color: #f1707a; border-color: var(--red); }
 .task-row { display: flex; align-items: center; gap: 12px; background: var(--bg2); border: 1px solid var(--border);

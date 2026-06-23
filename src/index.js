@@ -7,6 +7,7 @@ import { seedIfEmpty } from './store/seed.js';
 import { applyEnvCredentials } from './store/envCredentials.js';
 import { startReminderScheduler } from './core/reminders.js';
 import { startDailyReportScheduler } from './core/dailyReport.js';
+import { startSlaMonitor } from './core/sla.js';
 import { logger } from './logger.js';
 
 const log = logger('boot');
@@ -19,6 +20,7 @@ const server = http.createServer(app);
 attachRealtime(server);
 startReminderScheduler();
 startDailyReportScheduler();
+startSlaMonitor();
 
 /** First non-internal IPv4 — the address phones on the same Wi-Fi can reach. */
 function lanAddress() {
