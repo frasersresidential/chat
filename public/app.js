@@ -133,6 +133,7 @@ async function boot() {
   connectWs();
   render();
   refreshTaskBadge();
+  if ('Notification' in window && Notification.permission === 'granted') enablePush();
 }
 
 async function loadContext() {
@@ -243,9 +244,30 @@ function initSound() {
       try { await Notification.requestPermission(); } catch { /* ignore */ }
     }
     updateSoundBtn();
+    if (soundEnabled && 'Notification' in window && Notification.permission === 'granted') enablePush();
   };
 }
 function updateSoundBtn() { const b = $('#soundBtn'); if (b) b.textContent = soundEnabled ? '🔊' : '🔕'; }
+
+// ── Web Push (mobile notifications even when the app is closed) ────────────────
+function urlBase64ToUint8Array(base64) {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function enablePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const { key, enabled } = await api('/push/key');
+    if (!enabled || !key) return;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+    await api('/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub }) });
+  } catch (e) { console.warn('push subscribe failed', e); }
+}
 function beep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();

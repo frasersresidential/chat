@@ -3,15 +3,19 @@ import os from 'node:os';
 import { config } from './config.js';
 import { createApp } from './server/app.js';
 import { attachRealtime } from './server/realtime.js';
+import { db } from './store/db.js';
 import { seedIfEmpty } from './store/seed.js';
 import { applyEnvCredentials } from './store/envCredentials.js';
 import { startReminderScheduler } from './core/reminders.js';
 import { startDailyReportScheduler } from './core/dailyReport.js';
 import { startSlaMonitor } from './core/sla.js';
+import { initPush } from './core/push.js';
 import { logger } from './logger.js';
 
 const log = logger('boot');
 
+await db.init();          // hydrate from Postgres when DATABASE_URL is set
+await initPush();         // set up Web Push when web-push / VAPID are available
 seedIfEmpty();
 applyEnvCredentials(); // copy any real keys from .env onto seeded accounts
 

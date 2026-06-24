@@ -43,7 +43,8 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
-| **PWA** | Installable, mobile-first; sound + desktop notifications. |
+| **PWA** | Installable, mobile-first; sound + desktop + **Web Push** notifications (reach the phone with the app closed). |
+| **Storage** | In-memory + JSON file by default; set `DATABASE_URL` for durable **Postgres** (write-through, zero code changes). |
 
 ---
 

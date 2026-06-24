@@ -4,7 +4,7 @@
  *   - navigations (HTML)             → network-first, fall back to cached shell
  *   - static assets (css/js/icons)   → stale-while-revalidate
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `omnichat-shell-${VERSION}`;
 const ASSETS = [
   '/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest',
@@ -21,6 +21,27 @@ self.addEventListener('activate', (e) => {
       Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k))),
     ).then(() => self.clients.claim()),
   );
+});
+
+// Web Push — show a notification even when the app/tab is closed.
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch { data = {}; }
+  e.waitUntil(self.registration.showNotification(data.title || 'OmniChat', {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.conversationId || data.type || undefined,
+    data: { conversationId: data.conversationId || null },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    if (self.clients.openWindow) return self.clients.openWindow('/');
+  }));
 });
 
 self.addEventListener('fetch', (e) => {

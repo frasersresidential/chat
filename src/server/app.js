@@ -17,6 +17,7 @@ import { createReminder, listReminders, completeReminder, remindersForConversati
 import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../core/dailyReport.js';
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
+import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -574,6 +575,13 @@ export function createApp() {
     const target = db.users.get(req.body.userId);
     if (!conv || !target) return res.status(400).json({ error: 'invalid conversation or user' });
     res.json(transfer(conv, target.id, req.user.id));
+  });
+
+  // ── Web Push (PWA) ────────────────────────────────────────────────────────
+  api.get('/push/key', (_req, res) => res.json({ key: vapidPublicKey(), enabled: pushEnabled() }));
+  api.post('/push/subscribe', (req, res) => {
+    try { res.status(201).json({ ok: true, id: saveSubscription(req.user.id, req.body.subscription)?.id }); }
+    catch (e) { res.status(400).json({ error: e.message }); }
   });
 
   // ── Notifications ─────────────────────────────────────────────────────────

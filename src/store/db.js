@@ -2,16 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nanoid } from 'nanoid';
+import { pgStore } from './pg.js';
+import { logger } from '../logger.js';
+
+const log = logger('db');
 
 /**
- * Zero-dependency JSON-file document store. Keeps the project installable
- * anywhere (no native modules) and good enough for a single-node deployment.
- * Swap this file for Postgres/Mongo behind the same method signatures when you
- * scale out — nothing else in the codebase touches storage directly.
- *
- * Collections (think tables):
- *   organizations, users, teams, teamMembers, channelAccounts,
- *   routingRules, conversations, messages, assignments, notifications
+ * Document store with a fast synchronous in-memory state. Persistence is
+ * pluggable: a debounced JSON file by default, or write-through to Postgres
+ * when DATABASE_URL is set (call db.init() at boot). Business logic never
+ * touches storage directly — only these method signatures.
  */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'store.json');
@@ -31,6 +31,7 @@ const EMPTY = () => ({
   autoReplies: {},
   projects: {},
   reminders: {},
+  pushSubscriptions: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -44,16 +45,26 @@ function load() {
 }
 
 let state = load();
+let mode = 'file'; // 'file' | 'pg'
 let writeTimer = null;
 
-/** Debounced async persist so we don't thrash the disk on bursty traffic. */
-function persist() {
+/** Debounced JSON-file write so we don't thrash the disk on bursty traffic. */
+function persistFile() {
   if (writeTimer) return;
   writeTimer = setTimeout(() => {
     writeTimer = null;
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFile(DATA_FILE, JSON.stringify(state, null, 2), () => {});
   }, 50);
+}
+
+/** Persist a single changed row (data === null → delete). */
+function persistRow(name, id, data) {
+  if (mode === 'pg') {
+    if (data === null) pgStore.del(name, id); else pgStore.upsert(name, id, data);
+  } else {
+    persistFile();
+  }
 }
 
 /** Generic collection helpers. */
@@ -68,7 +79,7 @@ function collection(name) {
       const now = new Date().toISOString();
       const row = { id, createdAt: now, updatedAt: now, ...doc };
       state[name][id] = row;
-      persist();
+      persistRow(name, id, row);
       return row;
     },
     update: (id, patch) => {
@@ -76,12 +87,12 @@ function collection(name) {
       if (!cur) return null;
       const row = { ...cur, ...patch, updatedAt: new Date().toISOString() };
       state[name][id] = row;
-      persist();
+      persistRow(name, id, row);
       return row;
     },
     remove: (id) => {
       delete state[name][id];
-      persist();
+      persistRow(name, id, null);
     },
   };
 }
@@ -101,6 +112,28 @@ export const db = {
   autoReplies: collection('autoReplies'),
   projects: collection('projects'),
   reminders: collection('reminders'),
+  pushSubscriptions: collection('pushSubscriptions'),
+
+  /**
+   * Load persisted data. When DATABASE_URL is set, hydrate from Postgres and
+   * switch to write-through mode; otherwise keep the file-backed state.
+   */
+  async init() {
+    if (!pgStore.enabled) { mode = 'file'; return; }
+    try {
+      const rows = await pgStore.init();
+      state = EMPTY();
+      for (const r of rows) {
+        if (r.collection === '_cursors') state.rrCursors[r.id] = r.data?.value;
+        else if (state[r.collection]) state[r.collection][r.id] = r.data;
+      }
+      mode = 'pg';
+      log.info('using Postgres persistence');
+    } catch (e) {
+      log.error(`Postgres init failed — falling back to file: ${e.message}`);
+      mode = 'file';
+    }
+  },
 
   /** Round-robin cursor accessors (kept outside generic CRUD on purpose). */
   getCursor(key) {
@@ -108,7 +141,7 @@ export const db = {
   },
   setCursor(key, value) {
     state.rrCursors[key] = value;
-    persist();
+    persistRow('_cursors', key, { value });
   },
 
   /** True when the store has never been seeded. */
@@ -119,6 +152,7 @@ export const db = {
   /** Test helper — wipe everything. */
   _reset() {
     state = EMPTY();
-    persist();
+    if (mode === 'pg') pgStore.truncate().catch(() => {}); else persistFile();
   },
 };
+

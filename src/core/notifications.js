@@ -1,10 +1,12 @@
 import { db } from '../store/db.js';
 import { bus } from './eventBus.js';
+import { sendPush } from './push.js';
 
 /**
  * In-app notifications. The realtime layer relays 'notification:created' to the
  * target user's open sockets. Persisted so unseen notifications survive a
- * reconnect.
+ * reconnect. Also delivered as a Web Push (when the user has subscribed) so it
+ * reaches their phone even with the app closed.
  */
 export function notify(userId, { type, title, body, conversationId = null }) {
   if (!userId) return null;
@@ -17,6 +19,7 @@ export function notify(userId, { type, title, body, conversationId = null }) {
     read: false,
   });
   bus.emit('notification:created', n);
+  sendPush(userId, { title, body, conversationId, type });
   return n;
 }
 
