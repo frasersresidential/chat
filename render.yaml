@@ -1,5 +1,12 @@
 # One-click deploy to Render (https://render.com).
 # In Render: New → Blueprint → connect this repo → it reads this file.
+#
+# Minimal, zero-input blueprint: a single free web service, no database to
+# provision, no secrets to paste — so the blueprint sync can't fail on a
+# missing/paid resource. Storage runs in the built-in JSON file store
+# (ephemeral on Render free: data resets on redeploy/restart — fine for a
+# trial). To make data durable, add a Postgres instance in the Render
+# dashboard and set its connection string as DATABASE_URL (see below).
 services:
   - type: web
     name: omnichat
@@ -10,22 +17,11 @@ services:
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: AUTH_SECRET
         generateValue: true        # Render generates a strong random secret
-      - key: DEMO_PASSWORD
-        sync: false                # set your own in the dashboard
-      - key: DATABASE_URL          # durable Postgres storage (see databases below)
-        fromDatabase:
-          name: omnichat-db
-          property: connectionString
-      # Web Push: generate a pair with `npx web-push generate-vapid-keys` and
-      # paste them here (sync:false → set in the dashboard) so subscriptions
-      # persist across deploys.
-      - key: VAPID_PUBLIC_KEY
-        sync: false
-      - key: VAPID_PRIVATE_KEY
-        sync: false
-
-databases:
-  - name: omnichat-db
-    plan: free                     # free Postgres (note: free DBs expire after ~90 days)
+      # ── Optional, set in the dashboard if you want them ──────────────────
+      # DEMO_PASSWORD   — login password (defaults to "demo1234" if unset)
+      # DATABASE_URL    — a Postgres connection string → durable storage
+      # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — Web Push (npx web-push generate-vapid-keys)
