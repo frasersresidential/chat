@@ -301,6 +301,7 @@ function render() {
   if (state.view === 'automation') return renderAutomation(main);
   if (state.view === 'broadcast') return renderBroadcast(main);
   if (state.view === 'reports') return renderReports(main);
+  if (state.view === 'prospects') return renderProspects(main);
   if (state.view === 'simulator') return renderSimulator(main);
 }
 
@@ -1424,6 +1425,176 @@ async function renderReports(main) {
 }
 function gradeColor(g) {
   return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';
+}
+
+// ── Prospects (interest scoring) ──────────────────────────────────────────────────
+const TIER_META = {
+  hot: { label: '🔥 Hot', color: '#da3633' },
+  warm: { label: '🌤️ Warm', color: '#d29922' },
+  cold: { label: '❄️ Cold', color: '#388bfd' },
+};
+const tierBadge = (tier) => {
+  const m = TIER_META[tier] || TIER_META.cold;
+  return `<span class="pill" style="background:${m.color}22;color:${m.color};border:1px solid ${m.color}66">${m.label}</span>`;
+};
+const miniBar = (label, v) =>
+  `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)"><span style="width:42px">${label}</span>
+    <span class="bartrack" style="flex:1"><span class="barfill" style="width:${v}%;background:var(--accent)"></span></span><span style="width:24px;text-align:right">${v}</span></div>`;
+
+async function renderProspects(main) {
+  state.prospectTier = state.prospectTier || '';
+  let data;
+  try {
+    const qs = new URLSearchParams();
+    if (state.prospectTier) qs.set('tier', state.prospectTier);
+    if (state.prospectQuery) qs.set('q', state.prospectQuery);
+    data = await api('/leads?' + qs.toString());
+  } catch (e) {
+    main.innerHTML = `<div class="admin"><h2>Prospects</h2><p class="muted">ต้องมีสิทธิ์ View Analytics (Owner / Admin / Manager) จึงจะใช้งานได้</p></div>`;
+    return;
+  }
+  const s = data.summary;
+  const leads = data.leads;
+  const stat = (label, value, sub = '') =>
+    `<div class="stat"><div class="stat-v">${value}</div><div class="stat-l">${label}</div>${sub ? `<div class="muted" style="font-size:11px">${sub}</div>` : ''}</div>`;
+
+  main.innerHTML = `<div class="admin">
+    <div class="report-toolbar">
+      <h2 style="margin:0">🎯 Prospect Scoring — คะแนนความน่าสนใจลูกค้า</h2>
+      <div class="report-actions">
+        <input id="pSearch" placeholder="ค้นหา ชื่อ/เบอร์/โครงการ" value="${esc(state.prospectQuery || '')}" style="min-width:180px" />
+        <select id="pTier">
+          <option value="">ทุกระดับ</option>
+          <option value="hot" ${state.prospectTier === 'hot' ? 'selected' : ''}>🔥 Hot</option>
+          <option value="warm" ${state.prospectTier === 'warm' ? 'selected' : ''}>🌤️ Warm</option>
+          <option value="cold" ${state.prospectTier === 'cold' ? 'selected' : ''}>❄️ Cold</option>
+        </select>
+        <label class="btn" style="cursor:pointer">⬆️ นำเข้าไฟล์ (xlsx/csv)<input type="file" id="pFile" accept=".xlsx,.csv" hidden /></label>
+        <button class="btn ghost" id="pExport">⬇️ Export CSV</button>
+        ${s.total ? '<button class="btn ghost" id="pClear">ล้างข้อมูล</button>' : ''}
+      </div>
+    </div>
+
+    <p class="muted" style="font-size:12px;margin-top:-4px">
+      ระบบให้คะแนน 0–100 จาก <b>Intent</b> (ความพร้อมซื้อ: เกรด, สถานะ, กลับมาดูซ้ำ, ระยะเวลาตัดสินใจ, สัญญาณในโน้ต)
+      + <b>Fit</b> (ตรงกลุ่มเป้าหมาย: รายได้, งบ, อาชีพ, ช่องทาง, พื้นที่) — คำนวณในเครื่อง ไม่ต้องต่อ LLM
+    </p>
+
+    ${s.total ? `<div class="stat-grid">
+      ${stat('ลูกค้าทั้งหมด', s.total)}
+      ${stat('🔥 Hot', s.tierCounts.hot, 'ควรปิดด่วน')}
+      ${stat('🌤️ Warm', s.tierCounts.warm)}
+      ${stat('❄️ Cold', s.tierCounts.cold)}
+      ${stat('คะแนนเฉลี่ย', s.avgScore)}
+      ${stat('ปิดการขายแล้ว', s.converted)}
+    </div>` : ''}
+
+    ${!s.total ? `<div class="card" style="text-align:center;padding:40px">
+      <div style="font-size:42px">📥</div>
+      <h3>ยังไม่มีข้อมูลลูกค้า</h3>
+      <p class="muted">นำเข้าไฟล์รายงาน (เช่น CoSale Visit & Revisit Report .xlsx หรือ .csv) เพื่อให้ระบบวิเคราะห์และจัดอันดับ prospect ที่น่าสนใจที่สุด</p>
+    </div>` : `
+    ${s.projects.length > 1 ? `<div class="card">
+      <h3>คะแนนเฉลี่ยตามโครงการ</h3>
+      <table><thead><tr><th>โครงการ</th><th>ลูกค้า</th><th>🔥 Hot</th><th>ปิดได้</th><th>คะแนนเฉลี่ย</th></tr></thead>
+      <tbody>${s.projects.map((p) => `<tr><td>${esc(p.project)}</td><td>${p.leads}</td><td>${p.hot}</td><td>${p.converted}</td>
+        <td><b style="color:${p.avgScore >= 70 ? TIER_META.hot.color : p.avgScore >= 45 ? TIER_META.warm.color : TIER_META.cold.color}">${p.avgScore}</b></td></tr>`).join('')}</tbody></table>
+    </div>` : ''}
+
+    <div class="card">
+      <h3>อันดับลูกค้าน่าสนใจ (${leads.length})</h3>
+      <table class="prospect-table"><thead><tr><th>#</th><th>ลูกค้า</th><th>โครงการ</th><th>คะแนน</th><th>เกรด/สถานะ</th><th>งบ/รายได้</th><th>สัญญาณ</th><th>เซลส์</th></tr></thead>
+      <tbody>${leads.map((l, i) => prospectRow(l, i)).join('')}</tbody></table>
+    </div>`}
+  </div>`;
+
+  // Filters
+  $('#pTier').onchange = () => { state.prospectTier = $('#pTier').value; renderProspects(main); };
+  let searchTimer;
+  $('#pSearch').oninput = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.prospectQuery = $('#pSearch').value.trim(); renderProspects(main); }, 300);
+  };
+  // Import
+  $('#pFile').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const label = main.querySelector('label.btn');
+    const prev = label.innerHTML; label.innerHTML = '⏳ กำลังวิเคราะห์…';
+    try {
+      const res = await fetch('/api/leads/import', {
+        method: 'POST',
+        headers: {
+          authorization: state.token ? 'Bearer ' + state.token : '',
+          'content-type': file.type || 'application/octet-stream',
+          'x-file-name': encodeURIComponent(file.name),
+        },
+        body: await file.arrayBuffer(),
+      });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out.error || 'import failed');
+      alert(`✓ นำเข้าสำเร็จ ${out.imported} ราย (ใหม่ ${out.created} · อัปเดต ${out.updated})\n🔥 Hot ${out.tierCounts.hot} · 🌤️ Warm ${out.tierCounts.warm} · ❄️ Cold ${out.tierCounts.cold}`);
+      renderProspects(main);
+    } catch (err) { alert('✕ ' + err.message); label.innerHTML = prev; }
+  };
+  if ($('#pExport')) $('#pExport').onclick = async () => {
+    const res = await fetch('/api/leads/export' + (state.prospectTier ? '?tier=' + state.prospectTier : ''), { headers: { authorization: state.token ? 'Bearer ' + state.token : '' } });
+    const blob = await res.blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'prospects.csv'; a.click();
+  };
+  if ($('#pClear')) $('#pClear').onclick = async () => {
+    if (!confirm('ลบข้อมูลลูกค้าที่นำเข้าทั้งหมด?')) return;
+    await api('/leads', { method: 'DELETE' });
+    renderProspects(main);
+  };
+  // Expand a row to show the scoring breakdown.
+  main.querySelectorAll('.prospect-table tbody tr[data-id]').forEach((tr) => {
+    tr.onclick = () => toggleProspectDetail(tr);
+  });
+}
+
+function prospectRow(l, i) {
+  const decision = l.signals?.decisionBucket && l.signals.decisionBucket !== 'unknown' ? l.signals.decisionBucket : '';
+  const sig = [];
+  if (l.revisit) sig.push('<span class="chip">🔁 ดูซ้ำ</span>');
+  if (l.signals?.interested) sig.push('<span class="chip">สนใจ</span>');
+  if (l.signals?.comparing) sig.push('<span class="chip">เทียบโครงการ</span>');
+  if (l.signals?.loanReady) sig.push('<span class="chip">สินเชื่อพร้อม</span>');
+  if (l.signals?.loanConcern) sig.push('<span class="chip" style="color:#da3633">⚠ ติดกู้</span>');
+  if (decision) sig.push(`<span class="chip">⏱ ${esc(decision)}</span>`);
+  return `<tr data-id="${l.id}" style="cursor:pointer">
+    <td>${i + 1}</td>
+    <td><b>${esc(l.customerName || '—')}</b>${l.converted ? ' <span class="chip" style="color:#2ea043">✓ ปิดได้</span>' : ''}<div class="muted" style="font-size:11px">${esc(l.mobile || '')}</div></td>
+    <td>${esc(l.project || '—')}</td>
+    <td><div style="display:flex;align-items:center;gap:8px"><b style="font-size:18px">${l.score}</b>${tierBadge(l.tier)}</div>
+      <div style="margin-top:3px;min-width:130px">${miniBar('intent', l.intent)}${miniBar('fit', l.fit)}</div></td>
+    <td>${esc(l.grading || '—')}<div class="muted" style="font-size:11px">${esc(l.stage || '')}</div></td>
+    <td>${esc(l.budget || '—')}<div class="muted" style="font-size:11px">${esc(l.salary || '')}</div></td>
+    <td>${sig.join(' ') || '<span class="muted">—</span>'}</td>
+    <td class="muted" style="font-size:12px">${esc(l.owner || '—')}</td>
+  </tr>`;
+}
+
+async function toggleProspectDetail(tr) {
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('prospect-detail')) { next.remove(); return; }
+  let lead;
+  try { lead = await api('/leads/' + tr.dataset.id); } catch { return; }
+  const groups = { intent: 'Intent — ความพร้อมซื้อ', fit: 'Fit — ตรงกลุ่มเป้าหมาย' };
+  const factorHtml = (g) => (lead.factors || []).filter((f) => f.group === g).map((f) =>
+    `<div class="barrow"><span class="barlbl" title="${esc(f.detail)}">${esc(f.label)}</span>
+      <span class="bartrack"><span class="barfill" style="width:${(f.points / f.max) * 100}%"></span></span>
+      <span class="barval">${f.points}/${f.max}</span></div>
+      <div class="muted" style="font-size:11px;margin:-4px 0 6px 4px">${esc(f.detail)}</div>`).join('');
+  const detail = document.createElement('tr');
+  detail.className = 'prospect-detail';
+  detail.innerHTML = `<td colspan="8"><div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:6px 4px 10px">
+      <div><h4 style="margin:4px 0">${groups.intent}</h4>${factorHtml('intent')}</div>
+      <div><h4 style="margin:4px 0">${groups.fit}</h4>${factorHtml('fit')}</div>
+    </div>
+    ${lead.notes ? `<details style="margin:0 4px 8px"><summary class="muted" style="cursor:pointer">โน้ตการเข้าชม (Visit notes)</summary>
+      <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel,#161b22);padding:10px;border-radius:8px;max-height:240px;overflow:auto">${esc(lead.notes)}</pre></details>` : ''}</td>`;
+  tr.after(detail);
 }
 
 // ── Simulator ────────────────────────────────────────────────────────────────────

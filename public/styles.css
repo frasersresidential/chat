@@ -267,6 +267,11 @@ code.hookurl { cursor: pointer; font-size: 11px; color: var(--accent); word-brea
 .task-due { font-size: 12px; color: var(--accent); margin-top: 3px; }
 .task-overdue { color: var(--red); }
 
+/* Prospect scoring table */
+.prospect-table tbody tr[data-id]:hover { background: var(--bg2); }
+.prospect-detail > td { background: var(--bg2); border-top: none; }
+.prospect-detail h4 { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+
 /* Mobile-only controls hidden on desktop */
 .mobile-only { display: none; }
 

@@ -40,6 +40,7 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Agent tools** | Image/video/file attachments, canned quick replies, emoji picker, live "typing…" indicator. |
 | **Tags & grading** | Free-form tags + A–F lead grade per conversation; full-text search across chats. |
 | **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
+| **Prospect scoring** | Import a CRM visit/enquiry report (xlsx/csv), score every customer's *interest* 0–100 (Intent × Fit) and rank the hottest, on-target prospects — with an explainable factor breakdown. Runs fully offline; no LLM required. |
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
@@ -138,6 +139,46 @@ LINE `X-Line-Signature`, X CRC/`X-Twitter-Webhooks-Signature`, TikTok HMAC).
 
 ---
 
+## 🎯 Prospect interest scoring
+
+Open the **Prospects** tab → **นำเข้าไฟล์ (xlsx/csv)** and drop in a sales
+report (e.g. a *CoSale Visit & Revisit Report*). Each customer gets a 0–100
+**interest score**, a tier (🔥 Hot / 🌤️ Warm / ❄️ Cold) and a transparent
+breakdown so the team chases the right people first.
+
+The score is the blend of two explainable sub-scores:
+
+| Sub-score | Means | Signals used |
+|---|---|---|
+| **Intent** | How ready-to-buy *right now* | Sales grade (A–F), pipeline stage, revisit, decision timeframe, buying cues in the visit notes |
+| **Fit** | How well they match the ideal buyer | Income, budget, occupation, lead source, target area, data completeness |
+
+```
+interest = round(0.6·intent + 0.4·fit)     # weights/thresholds in DEFAULT_CONFIG
+```
+
+The importer (`src/core/xlsx.js`) is a dependency-free xlsx/csv reader and
+matches columns by *fuzzy header name*, so most CRM exports map cleanly. The
+scorer (`src/core/leadScoring.js`) is pure and deterministic — easy to tune and
+unit-test (`npm test`).
+
+**Do we need an LLM?** No — not for this. All scoring runs **offline** with
+keyword heuristics over the Thai free-text notes (`analyzeNotes()`), which is
+fast, free, private and explainable. An LLM only adds value if you later want
+deeper reading of the notes (nuanced sentiment, auto-extracting objections or
+financial readiness, summarising). The code is built for that: pass a richer
+analysis into `scoreLead(lead, { analysis })` and it overrides the heuristic one
+— a clean drop-in seam, no rewrite. Start rules-first; add an LLM enrichment
+pass only where the notes are too subtle for keywords.
+
+```
+GET    /api/leads            ranked, filterable prospects + org summary
+GET    /api/leads/:id        full factor breakdown + notes
+POST   /api/leads/import     upload xlsx/csv bytes (X-File-Name header)
+GET    /api/leads/export     ranked prospects as CSV
+DELETE /api/leads            clear imported leads
+```
+
 ## 🔐 Roles & permissions
 
 | Role | Reply | Assign | Takeover | View all | Round-robin owner |
@@ -155,7 +196,7 @@ LINE `X-Line-Signature`, X CRC/`X-Twitter-Webhooks-Signature`, TikTok HMAC).
 
 `organizations, users, teams, team_members, channel_accounts, routing_rules,
 conversations, messages, conversation_assignments (round_robin|manual|ai|transfer),
-notifications`.
+notifications, leads (imported + scored prospects)`.
 
 ## 🔑 API (selected)
 

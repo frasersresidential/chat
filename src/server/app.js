@@ -11,6 +11,7 @@ import { assign, transfer, ASSIGNMENT_TYPE } from '../core/routing.js';
 import { teamTree } from '../core/teams.js';
 import { listNotifications, markRead as markNotifRead } from '../core/notifications.js';
 import { buildReport, exportConversationsCSV, exportAgentsCSV } from '../core/reports.js';
+import { importLeads, listLeads, getLead, leadsSummary, clearLeads, exportLeadsCSV, scoreConversation } from '../core/leads.js';
 import { broadcast, broadcastAudience } from '../core/automation.js';
 import { defaultBusinessHours, sanitizeBusinessHours, isWithinBusinessHours } from '../core/businessHours.js';
 import { createReminder, listReminders, completeReminder, remindersForConversation } from '../core/reminders.js';
@@ -279,6 +280,58 @@ export function createApp() {
     res.send(csv);
   });
 
+  // ── Prospect leads / interest scoring ─────────────────────────────────────
+  // Import a CRM visit/enquiry report (xlsx or csv), score every customer's
+  // "interest" and rank them so the team chases on-target prospects first.
+  api.get('/leads', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    res.json({
+      summary: leadsSummary(req.user.organizationId),
+      leads: listLeads(req.user.organizationId, {
+        tier: req.query.tier || null,
+        project: req.query.project || null,
+        q: req.query.q || null,
+        minScore: req.query.minScore ? Number(req.query.minScore) : null,
+      }),
+    });
+  });
+
+  api.get('/leads/summary', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    res.json(leadsSummary(req.user.organizationId));
+  });
+
+  api.get('/leads/export', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    const csv = exportLeadsCSV(req.user.organizationId, { tier: req.query.tier || null, project: req.query.project || null });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="omnichat-prospects.csv"');
+    res.send(csv);
+  });
+
+  api.get('/leads/:id', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    const lead = getLead(req.user.organizationId, req.params.id);
+    if (!lead) return res.status(404).json({ error: 'not found' });
+    res.json(lead);
+  });
+
+  // Raw file upload (xlsx/csv bytes) — same dependency-free pattern as /uploads.
+  api.post('/leads/import', requirePerm(PERMISSIONS.VIEW_ANALYTICS),
+    express.raw({ type: '*/*', limit: '26214400' }), (req, res) => {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ error: 'empty upload' });
+      }
+      let filename = 'import.xlsx';
+      try { filename = decodeURIComponent(req.header('x-file-name') || filename); } catch { /* keep default */ }
+      try {
+        res.status(201).json(importLeads(req.user.organizationId, req.body, filename, { userId: req.user.id }));
+      } catch (e) {
+        log.error(`lead import failed: ${e.message}`);
+        res.status(400).json({ error: e.message });
+      }
+    });
+
+  api.delete('/leads', requirePerm(PERMISSIONS.VIEW_ANALYTICS), (req, res) => {
+    res.json(clearLeads(req.user.organizationId));
+  });
+
   // ── Automation: auto-replies / chatbot ────────────────────────────────────
   api.get('/auto-replies', (req, res) => {
     res.json(db.autoReplies.filter((r) => r.organizationId === req.user.organizationId));
@@ -420,7 +473,7 @@ export function createApp() {
     if (!thread || thread.conversation.organizationId !== req.user.organizationId) {
       return res.status(404).json({ error: 'not found' });
     }
-    res.json({ ...thread, conversation: decorateConversation(thread.conversation), reminders: remindersForConversation(thread.conversation.id) });
+    res.json({ ...thread, conversation: decorateConversation(thread.conversation), reminders: remindersForConversation(thread.conversation.id), prospect: scoreConversation(thread.conversation) });
   });
 
   api.post('/conversations/:id/read', (req, res) => {
