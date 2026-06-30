@@ -5,7 +5,7 @@ services:
     name: omnichat
     runtime: node
     plan: free
-    branch: main
+    branch: claude/customer-interest-scoring-mh13p9   # ← deploys the Prospect-scoring build; switch to your default branch once merged
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
