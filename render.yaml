@@ -1,18 +1,36 @@
 # One-click deploy to Render (https://render.com).
 # In Render: New → Blueprint → connect this repo → it reads this file.
 #
-# Minimal, zero-input blueprint: a single free web service, no database to
-# provision, no secrets to paste — so the blueprint sync can't fail on a
-# missing/paid resource. Storage runs in the built-in JSON file store
-# (ephemeral on Render free: data resets on redeploy/restart — fine for a
-# trial). To make data durable, add a Postgres instance in the Render
-# dashboard and set its connection string as DATABASE_URL (see below).
+# Two independent free web services, each its own URL:
+#   • prospect-scoring — the standalone Prospect Scoring app (CRM analytics)
+#   • omnichat         — the omni-channel chat inbox
+# Zero-input: no database to provision, no secrets to paste, so the blueprint
+# sync can't fail on a missing/paid resource. Storage uses the built-in JSON
+# file store (ephemeral on Render free). For durable data, add a Postgres in
+# the dashboard and set DATABASE_URL.
 services:
+  # ── Standalone Prospect Scoring app ──────────────────────────────────────
+  - type: web
+    name: prospect-scoring
+    runtime: node
+    plan: free
+    branch: claude/customer-interest-scoring-mh13p9   # ← switch to your default branch once merged
+    buildCommand: npm install
+    startCommand: npm run start:prospect
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SECRET
+        generateValue: true        # Render generates a strong random secret
+      # PROSPECT_PASSWORD — login password (defaults to "demo1234" if unset)
+
+  # ── OmniChat omni-channel inbox ──────────────────────────────────────────
   - type: web
     name: omnichat
     runtime: node
     plan: free
-    branch: claude/customer-interest-scoring-mh13p9   # ← deploys the Prospect-scoring build; switch to your default branch once merged
+    branch: claude/customer-interest-scoring-mh13p9
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
@@ -20,8 +38,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: AUTH_SECRET
-        generateValue: true        # Render generates a strong random secret
-      # ── Optional, set in the dashboard if you want them ──────────────────
-      # DEMO_PASSWORD   — login password (defaults to "demo1234" if unset)
-      # DATABASE_URL    — a Postgres connection string → durable storage
-      # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — Web Push (npx web-push generate-vapid-keys)
+        generateValue: true
+      # DEMO_PASSWORD — login password (defaults to "demo1234" if unset)
+      # DATABASE_URL  — a Postgres connection string → durable storage

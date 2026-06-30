@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Prospect Scoring — คะแนนความน่าสนใจลูกค้า</title>
+  <meta name="theme-color" content="#f6f8fa" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Login overlay -->
+  <div id="login" class="login-screen hidden">
+    <form id="loginForm" class="login-card">
+      <div class="brand">🎯 <span>Prospect Scoring</span></div>
+      <p class="muted" style="margin:0">วิเคราะห์และให้คะแนนความน่าสนใจของลูกค้า</p>
+      <input id="pw" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" />
+      <button class="btn" type="submit">เข้าสู่ระบบ</button>
+      <div id="loginErr" class="login-err hidden"></div>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">🎯 <span>Prospect Scoring</span></div>
+      <div class="topbar-right">
+        <button id="logoutBtn" class="btn ghost">ออกจากระบบ</button>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

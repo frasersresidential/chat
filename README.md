@@ -173,11 +173,28 @@ pass only where the notes are too subtle for keywords.
 
 ```
 GET    /api/leads            ranked, filterable prospects + org summary
-GET    /api/leads/:id        full factor breakdown + notes
+GET    /api/leads/:id        full factor breakdown + radar axes + notes
 POST   /api/leads/import     upload xlsx/csv bytes (X-File-Name header)
 GET    /api/leads/export     ranked prospects as CSV
 DELETE /api/leads            clear imported leads
 ```
+
+Each expanded customer shows an 8-axis **radar chart** (เกรด · สถานะ · เร่งด่วน ·
+ดูซ้ำ · งบ · รายได้ · อาชีพ · สนใจ) — a dependency-free SVG, no chart library.
+
+### Standalone app
+
+The same engine also ships as a **self-contained Prospect Scoring app** (its own
+login, UI and deploy) for teams that only want the CRM analytics, not the chat
+inbox:
+
+```bash
+npm run start:prospect      # → http://localhost:3100  (login password: PROSPECT_PASSWORD, default demo1234)
+```
+
+It lives in `prospect-app/` and reuses `src/core/{leadScoring,leads,xlsx}.js`
+untouched. `render.yaml` deploys it as its own free web service (`prospect-scoring`)
+alongside `omnichat`, each on its own URL.
 
 ## 🔐 Roles & permissions
 
