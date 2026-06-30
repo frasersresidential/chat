@@ -1593,7 +1593,7 @@ async function toggleProspectDetail(tr) {
       <div><h4 style="margin:4px 0">${groups.fit}</h4>${factorHtml('fit')}</div>
     </div>
     ${lead.notes ? `<details style="margin:0 4px 8px"><summary class="muted" style="cursor:pointer">โน้ตการเข้าชม (Visit notes)</summary>
-      <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel,#161b22);padding:10px;border-radius:8px;max-height:240px;overflow:auto">${esc(lead.notes)}</pre></details>` : ''}</td>`;
+      <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel,#f6f8fa);padding:10px;border-radius:8px;max-height:240px;overflow:auto;border:1px solid var(--border)">${esc(lead.notes)}</pre></details>` : ''}</td>`;
   tr.after(detail);
 }
 
