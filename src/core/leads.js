@@ -91,6 +91,7 @@ export function buildLeadRecord(organizationId, raw, extra = {}) {
     converted: scored.converted,
     signals: scored.analysis,
     factors: scored.factors,
+    radar: scored.radar,
     ...extra,
   };
 }
@@ -143,7 +144,7 @@ export function publicLead(l, { full = false } = {}) {
     score: l.score, tier: l.tier, intent: l.intent, fit: l.fit, converted: l.converted,
     signals: l.signals, importedAt: l.importedAt,
   };
-  return full ? { ...base, factors: l.factors, notes: l.notes, visitRemark: l.visitRemark, utm: l.utm } : base;
+  return full ? { ...base, factors: l.factors, radar: l.radar, notes: l.notes, visitRemark: l.visitRemark, utm: l.utm } : base;
 }
 
 /** Ranked, filterable list of scored leads for the org. */

@@ -37,6 +37,35 @@ test('analyzeNotes flags a loan-approval concern', () => {
   assert.ok(a.loanConcern);
 });
 
+test('analyzeNotes reads income + timeframe from the labelled note fields', () => {
+  const note = 'รายได้รวม (ผู้กู้) : 50,000-60,000 บาท\nระยะเวลาตัดสินใจซื้อ : 1-3 เดือน\nรายละเอียดลูกค้า (Details) : ' + 'x'.repeat(220);
+  const a = analyzeNotes(note);
+  assert.equal(a.noteIncome, 60000);
+  assert.equal(a.decisionBucket, '1-3m');
+  assert.ok(a.detailRich);
+});
+
+test('"ครอบครัว" reads as motivation, not as an objection', () => {
+  const a = analyzeNotes('ลูกค้าอยากซื้อบ้านเป็นของตัวเอง มาดูกับครอบครัว มีลูกสองคน');
+  assert.ok(a.motivated);
+  assert.equal(a.objection, false);
+});
+
+test('income stated only in the note backfills the score when Salary is blank', () => {
+  const withNote = scoreLead({ grading: 'B', salary: '', notes: 'รายได้รวม (ผู้กู้) : 90,000 บาท' });
+  const without = scoreLead({ grading: 'B', salary: '', notes: 'ไม่มีข้อมูลรายได้' });
+  assert.ok(withNote.fit > without.fit, `note income should raise fit (${withNote.fit} vs ${without.fit})`);
+});
+
+test('scoreLead returns 8 radar axes in 0..100', () => {
+  const r = scoreLead({ grading: 'A : จอง', stage: 'Closed Won', revisit: true, salary: 'มากกว่า 40,001', budget: '3.5' });
+  assert.equal(r.radar.length, 8);
+  for (const a of r.radar) {
+    assert.ok(typeof a.axis === 'string' && a.axis.length);
+    assert.ok(a.value >= 0 && a.value <= 100, `${a.axis}=${a.value}`);
+  }
+});
+
 // ── Scoring ───────────────────────────────────────────────────────────────────
 test('a booked, high-income, soon-to-decide lead scores hot', () => {
   const r = scoreLead({

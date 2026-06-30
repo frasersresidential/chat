@@ -1441,6 +1441,32 @@ const miniBar = (label, v) =>
   `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)"><span style="width:42px">${label}</span>
     <span class="bartrack" style="flex:1"><span class="barfill" style="width:${v}%;background:var(--accent)"></span></span><span style="width:24px;text-align:right">${v}</span></div>`;
 
+// Zero-dependency SVG radar chart of a lead's scoring axes (0–100 each).
+// `chart` is the plotted diameter; extra padding in the viewBox leaves room for
+// the axis labels so they never bleed into neighbouring columns.
+function radarSvg(axes, chart = 150, color = 'var(--accent)') {
+  const padX = 62, padY = 30;
+  const w = chart + padX * 2, h = chart + padY * 2;
+  const cx = w / 2, cy = h / 2, r = chart / 2, n = axes.length;
+  const ang = (i) => (Math.PI * 2 * i / n) - Math.PI / 2;
+  const pt = (i, rad) => [cx + rad * Math.cos(ang(i)), cy + rad * Math.sin(ang(i))];
+  const poly = (rad, mapV) => axes.map((a, i) => pt(i, rad * (mapV ? a.value / 100 : 1)).map((v) => v.toFixed(1)).join(',')).join(' ');
+  let grid = '';
+  for (let ring = 1; ring <= 4; ring++) grid += `<polygon points="${poly(r * ring / 4)}" fill="none" stroke="var(--border)" stroke-width="1"/>`;
+  let spokes = '';
+  axes.forEach((a, i) => {
+    const [x, y] = pt(i, r);
+    spokes += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`;
+    const [lx, ly] = pt(i, r + 14);
+    const anchor = Math.abs(lx - cx) < 3 ? 'middle' : lx > cx ? 'start' : 'end';
+    spokes += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="10" fill="var(--muted)" text-anchor="${anchor}" dominant-baseline="middle">${esc(a.axis)} ${a.value}</text>`;
+  });
+  const dots = axes.map((a, i) => { const [x, y] = pt(i, r * a.value / 100); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${color}"/>`; }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+    ${grid}${spokes}
+    <polygon points="${poly(r, true)}" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-width="2"/>${dots}</svg>`;
+}
+
 async function renderProspects(main) {
   state.prospectTier = state.prospectTier || '';
   let data;
@@ -1586,14 +1612,41 @@ async function toggleProspectDetail(tr) {
       <span class="bartrack"><span class="barfill" style="width:${(f.points / f.max) * 100}%"></span></span>
       <span class="barval">${f.points}/${f.max}</span></div>
       <div class="muted" style="font-size:11px;margin:-4px 0 6px 4px">${esc(f.detail)}</div>`).join('');
+  // Chips summarizing what the engine read out of the free-text visit note.
+  const sg = lead.signals || {};
+  const insight = [];
+  if (sg.decisionBucket && sg.decisionBucket !== 'unknown') insight.push(`⏱ ตัดสินใจ ${esc(sg.decisionBucket)}`);
+  if (sg.noteIncome) insight.push(`💰 รายได้จากโน้ต ~${Number(sg.noteIncome).toLocaleString()}`);
+  if (sg.interested) insight.push('สนใจ');
+  if (sg.comparing) insight.push('เทียบโครงการอื่น');
+  if (sg.loanReady) insight.push('สินเชื่อพร้อม');
+  if (sg.motivated) insight.push('มีแรงจูงใจ');
+  if (sg.detailRich) insight.push('โน้ตละเอียด');
+  if (sg.loanConcern) insight.push('⚠ ติดเรื่องกู้');
+  if (sg.objection) insight.push('ยังลังเล');
+
   const detail = document.createElement('tr');
   detail.className = 'prospect-detail';
-  detail.innerHTML = `<td colspan="8"><div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:6px 4px 10px">
+  detail.innerHTML = `<td colspan="8"><div class="prospect-detail-grid">
+      <div class="radar-box">
+        <h4 style="margin:4px 0">โปรไฟล์ 8 มิติ</h4>
+        ${lead.radar ? radarSvg(lead.radar) : ''}
+        <div style="display:flex;gap:10px;justify-content:center;font-size:12px;margin-top:4px">
+          <span><b style="color:var(--accent)">Intent</b> ${lead.intent}</span>
+          <span><b style="color:var(--accent)">Fit</b> ${lead.fit}</span>
+        </div>
+      </div>
       <div><h4 style="margin:4px 0">${groups.intent}</h4>${factorHtml('intent')}</div>
       <div><h4 style="margin:4px 0">${groups.fit}</h4>${factorHtml('fit')}</div>
     </div>
-    ${lead.notes ? `<details style="margin:0 4px 8px"><summary class="muted" style="cursor:pointer">โน้ตการเข้าชม (Visit notes)</summary>
-      <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel,#f6f8fa);padding:10px;border-radius:8px;max-height:240px;overflow:auto;border:1px solid var(--border)">${esc(lead.notes)}</pre></details>` : ''}</td>`;
+    <div style="padding:0 4px 8px">
+      <h4 style="margin:6px 0">วิเคราะห์จากโน้ตการเข้าชม</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+        ${insight.length ? insight.map((s) => `<span class="chip">${s}</span>`).join('') : '<span class="muted" style="font-size:12px">ไม่พบสัญญาณชัดเจนในโน้ต</span>'}
+      </div>
+      ${lead.notes ? `<details><summary class="muted" style="cursor:pointer">อ่านโน้ตเต็ม (Visit notes)</summary>
+        <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel,#f6f8fa);padding:10px;border-radius:8px;max-height:240px;overflow:auto;border:1px solid var(--border)">${esc(lead.notes)}</pre></details>` : ''}
+    </div></td>`;
   tr.after(detail);
 }
 

@@ -49,30 +49,55 @@ const DECISION_BUCKETS = [
 ];
 
 /**
- * Analyze a free-text visit note and return discrete buying signals.
- * @returns {{ decisionScore:number, decisionBucket:string,
- *   interested:boolean, comparing:boolean, loanReady:boolean,
- *   loanConcern:boolean, objection:boolean }}
+ * Read a free-text visit note and extract the buying signals the sales team
+ * embed in it. The notes carry labelled fields ("ระยะเวลาตัดสินใจซื้อ : …",
+ * "รายได้รวม (ผู้กู้) : …") inside prose, so we parse those labels first and
+ * fall back to a looser scan of the whole note.
+ *
+ * @returns {{ decisionScore:number, decisionBucket:string, noteIncome:number|null,
+ *   detailRich:boolean, motivated:boolean, interested:boolean, comparing:boolean,
+ *   loanReady:boolean, loanConcern:boolean, objection:boolean }}
  */
 export function analyzeNotes(text) {
   const t = String(text || '');
+
+  // Decision timeframe — prefer the explicit label, else scan the whole note.
   let decisionBucket = 'unknown';
   let decisionScore = 0.4; // neutral when we can't tell
+  const tfLabel = t.match(/ระยะเวลา(?:ในการ)?ตัดสินใจ(?:ซื้อ)?\s*:?\s*([^\n\r]*)/);
+  const tfScope = tfLabel && tfLabel[1].trim() ? tfLabel[1] : t;
   for (const b of DECISION_BUCKETS) {
-    if (b.re.test(t)) { decisionBucket = b.key; decisionScore = b.score; break; }
+    if (b.re.test(tfScope)) { decisionBucket = b.key; decisionScore = b.score; break; }
   }
+
+  // Income stated inside the note ("รายได้รวม (ผู้กู้) : 50,000-60,000 บาท").
+  let noteIncome = null;
+  const incLabel = t.match(/รายได้รวม[^:\n]*:\s*([^\n\r]*)/) || t.match(/รายได้[^\n:]*:\s*([^\n\r]*)/);
+  if (incLabel) {
+    const nums = (incLabel[1].match(/\d[\d,.]*/g) || []).map((s) => Number(s.replace(/,/g, ''))).filter(Number.isFinite);
+    if (nums.length) {
+      let max = Math.max(...nums);
+      if (/ล้าน/.test(incLabel[1]) && max < 100) max *= 1_000_000; // "2-3 ล้าน"
+      if (max > 0) noteIncome = max;
+    }
+  }
+
   // A comparison line is only a real signal when it actually names a competitor.
   const compareLine = t.match(/(?:โครงการที่เปรียบเทียบ|เปรียบเทียบ(?:กับ)?)\s*:?\s*([^\n\r]*)/);
   const comparing = !!(compareLine && compareLine[1] && compareLine[1].replace(/[-\s]/g, '').length > 0);
 
+  // A long, detailed write-up = sales invested effort = a more serious lead.
+  const detailRich = /รายละเอียดลูกค้า|details/i.test(t) && t.length > 220;
+  // Emotional ownership / family motivation surfaced in the note.
+  const motivated = /(อยากซื้อบ้านเป็นของตัวเอง|อยากมีบ้าน(?:เป็นของตัวเอง)?|มีบ้านเป็นของตัวเอง|ครอบครัว|มีลูก|แต่งงาน|ผ่อนเท่าค่าเช่า)/.test(t);
+
   return {
-    decisionScore,
-    decisionBucket,
+    decisionScore, decisionBucket, noteIncome, detailRich, motivated,
     interested: /(สนใจ|อยากได้|อยากซื้อ|ชอบบ้าน|ตัดสินใจจอง|จอง)/.test(t),
     comparing,
     loanReady: /(กู้ผ่าน|พรีอนุมัติ|พรี-อนุมัติ|อนุมัติวงเงิน|ธนาคารให้วงเงิน|วงเงินอนุมัติ|ผ่านพรี)/.test(t),
     loanConcern: /(กู้ไม่ผ่าน|ติดเครดิต|ติดแบล|ติดบูโร|เครดิตไม่ดี|ภาระหนี้สูง)/.test(t),
-    objection: /(ยังไม่จอง|ขอกลับไปคิด|ยังไม่ตัดสินใจ|ขอปรึกษา|ยังไม่พร้อม|รอ)/.test(t),
+    objection: /(ยังไม่จอง|ขอกลับไปคิด|ยังไม่ตัดสินใจ|ขอปรึกษา|ยังไม่พร้อม|ขอรอ)/.test(t),
   };
 }
 
@@ -155,7 +180,14 @@ export function scoreLead(lead = {}, opts = {}) {
   const intent = clamp(intentFactors.reduce((a, f) => a + f.points, 0));
 
   // ── Fit / ICP (max 100) ───────────────────────────────────────────────────
-  const incScore = parseIncomeScore(lead.salary);
+  // Income: prefer the Salary column, but backfill from the income stated in
+  // the visit note ("รายได้รวม (ผู้กู้) : …") when the column is blank.
+  let incScore = parseIncomeScore(lead.salary);
+  let incFromNote = false;
+  if (incScore == null && analysis.noteIncome != null) {
+    incScore = Math.max(0, Math.min(1, analysis.noteIncome / 120_000));
+    incFromNote = true;
+  }
   const budgetM = parseBudgetM(lead.budget);
   const budgetScore = budgetM == null ? null : Math.max(0, Math.min(1, budgetM / cfg.budgetTargetM));
   const provinceHit = !!lead.province && cfg.targetProvinces.includes(String(lead.province).trim());
@@ -163,7 +195,8 @@ export function scoreLead(lead = {}, opts = {}) {
 
   const fitFactors = [
     factor('รายได้ (Salary)', (incScore == null ? 0.3 : incScore) * 35, 35,
-      incScore == null ? 'ไม่ระบุรายได้' : (lead.salary || '—')),
+      incScore == null ? 'ไม่ระบุรายได้'
+        : incFromNote ? `~${analysis.noteIncome.toLocaleString()} บ. (จากโน้ต)` : (lead.salary || '—')),
     factor('งบประมาณ (Budget)', (budgetScore == null ? 0.3 : budgetScore) * 30, 30,
       budgetM == null ? 'ไม่ระบุงบ' : `~${budgetM.toFixed(2)} ลบ.`),
     factor('อาชีพ (Occupation)', occupationScore(lead.occupation) * 12, 12, lead.occupation || '—'),
@@ -180,8 +213,21 @@ export function scoreLead(lead = {}, opts = {}) {
   const tier = score >= cfg.hotAt ? 'hot' : score >= cfg.warmAt ? 'warm' : 'cold';
   const converted = /(closed won|won|booked)/i.test(String(lead.stage || '')) || /จอง/.test(String(lead.visitRemark || lead.grading || ''));
 
+  // Eight 0–100 axes that summarize the prospect's shape for a radar chart.
+  const pct = (v) => Math.round(Math.max(0, Math.min(1, v)) * 100);
+  const radar = [
+    { axis: 'เกรด', value: pct(gScore) },
+    { axis: 'สถานะ', value: pct(sScore) },
+    { axis: 'เร่งด่วน', value: pct(analysis.decisionScore) },
+    { axis: 'ดูซ้ำ', value: lead.revisit ? 100 : 0 },
+    { axis: 'งบ', value: pct(budgetScore == null ? 0.3 : budgetScore) },
+    { axis: 'รายได้', value: pct(incScore == null ? 0.3 : incScore) },
+    { axis: 'อาชีพ', value: pct(occupationScore(lead.occupation)) },
+    { axis: 'สนใจ', value: pct(notesIntentPoints(analysis) / 13) },
+  ];
+
   return {
-    score, tier, intent, fit, converted, analysis,
+    score, tier, intent, fit, converted, analysis, radar,
     factors: [
       ...intentFactors.map((f) => ({ ...f, group: 'intent' })),
       ...fitFactors.map((f) => ({ ...f, group: 'fit' })),
@@ -193,9 +239,11 @@ export function scoreLead(lead = {}, opts = {}) {
 
 function notesIntentPoints(a) {
   let p = 0;
-  if (a.interested) p += 5;
-  if (a.comparing) p += 4; // actively comparison-shopping = a real buyer
-  if (a.loanReady) p += 4;
+  if (a.interested) p += 3;
+  if (a.comparing) p += 3; // actively comparison-shopping = a real buyer
+  if (a.loanReady) p += 3;
+  if (a.detailRich) p += 2; // a detailed write-up = a more serious lead
+  if (a.motivated) p += 2; // emotional/family ownership motivation
   if (a.objection) p -= 3;
   if (a.loanConcern) p -= 4;
   return Math.max(0, Math.min(13, p));
@@ -205,6 +253,8 @@ function notesIntentDetail(a) {
   if (a.interested) on.push('แสดงความสนใจ');
   if (a.comparing) on.push('เทียบโครงการอื่น');
   if (a.loanReady) on.push('สินเชื่อพร้อม');
+  if (a.motivated) on.push('มีแรงจูงใจ');
+  if (a.detailRich) on.push('โน้ตละเอียด');
   if (a.loanConcern) on.push('⚠ ติดเรื่องกู้');
   if (a.objection) on.push('ยังลังเล');
   return on.length ? on.join(', ') : 'ไม่พบสัญญาณชัดเจน';
