@@ -41,6 +41,7 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Tags & grading** | Free-form tags + A–F lead grade per conversation; full-text search across chats. |
 | **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
+| **Competitor Ad-spy** | Watch competitor Facebook Pages via the public **Meta Ad Library**: browse their live ad creatives, surface "winning" (longest-running) ads, save a swipe file, analyze their copy/CTAs/platforms/cadence, and get a **Web Push** the moment a rival launches a new ad. Runs on a mock dataset with zero credentials; set `META_AD_LIBRARY_TOKEN` for real data. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
 | **PWA** | Installable, mobile-first; sound + desktop + **Web Push** notifications (reach the phone with the app closed). |
@@ -170,5 +171,8 @@ GET  /api/inbox?mode=my|team|unassigned|all
 GET  /api/conversations/:id
 POST /api/conversations/:id/reply · /assign · /transfer · /takeover · /read
 GET  /api/notifications
+GET  /api/adspy/competitors · POST /api/adspy/competitors · POST /:id/refresh
+GET  /api/adspy/ads?competitorId=&sort=&q= · GET /api/adspy/winning · GET /api/adspy/insights
+POST /api/adspy/ads/:id/save
 WS   /ws?userId=...
 ```

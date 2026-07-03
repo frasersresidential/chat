@@ -16,6 +16,13 @@ export const config = {
   // Default password seeded users get, so the demo is loginable out of the box.
   demoPassword: process.env.DEMO_PASSWORD || 'demo1234',
 
+  // Competitor Ad-spy (Meta Ad Library). With a token the dashboard queries the
+  // real public Ad Library; without one it runs on a mock demo dataset.
+  adspy: {
+    token: process.env.META_AD_LIBRARY_TOKEN || '',
+    defaultCountry: (process.env.AD_LIBRARY_COUNTRY || 'TH').toUpperCase().slice(0, 2),
+  },
+
   channels: {
     messenger: {
       pageAccessToken: process.env.MESSENGER_PAGE_ACCESS_TOKEN || '',

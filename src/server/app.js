@@ -18,6 +18,10 @@ import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../cor
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
+import {
+  adspyConfig, listCompetitors, addCompetitor, updateCompetitor, removeCompetitor,
+  refreshCompetitor, refreshOrganization, listAds, winningAds, toggleSaved, insights,
+} from '../core/adspy.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -582,6 +586,66 @@ export function createApp() {
   api.post('/push/subscribe', (req, res) => {
     try { res.status(201).json({ ok: true, id: saveSubscription(req.user.id, req.body.subscription)?.id }); }
     catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  // ── Competitor Ad-spy (Meta Ad Library) ───────────────────────────────────
+  // Viewing competitive intel is gated behind analytics; managing the watchlist
+  // behind automation (same coarse perms used elsewhere).
+  const canViewAdspy = requirePerm(PERMISSIONS.VIEW_ANALYTICS);
+  const canManageAdspy = requirePerm(PERMISSIONS.MANAGE_AUTOMATION);
+  const ownCompetitor = (req, res) => {
+    const c = db.adCompetitors.get(req.params.id);
+    if (!c || c.organizationId !== req.user.organizationId) { res.status(404).json({ error: 'not found' }); return null; }
+    return c;
+  };
+
+  api.get('/adspy/config', canViewAdspy, (_req, res) => res.json(adspyConfig()));
+
+  api.get('/adspy/competitors', canViewAdspy, (req, res) => {
+    res.json(listCompetitors(req.user.organizationId));
+  });
+  api.post('/adspy/competitors', canManageAdspy, async (req, res) => {
+    try {
+      const c = addCompetitor(req.user.organizationId, req.body, req.user.id);
+      await refreshCompetitor(c); // populate immediately so the row isn't empty
+      res.status(201).json({ ...c, ...(listCompetitors(req.user.organizationId).find((x) => x.id === c.id) || {}) });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+  api.put('/adspy/competitors/:id', canManageAdspy, (req, res) => {
+    const c = ownCompetitor(req, res); if (!c) return;
+    res.json(updateCompetitor(c, req.body));
+  });
+  api.delete('/adspy/competitors/:id', canManageAdspy, (req, res) => {
+    const c = ownCompetitor(req, res); if (!c) return;
+    removeCompetitor(c);
+    res.status(204).end();
+  });
+  api.post('/adspy/competitors/:id/refresh', canManageAdspy, async (req, res) => {
+    const c = ownCompetitor(req, res); if (!c) return;
+    const { newAds, error } = await refreshCompetitor(c);
+    res.json({ newAds: newAds.length, error });
+  });
+  api.post('/adspy/refresh', canManageAdspy, async (req, res) => {
+    const results = await refreshOrganization(req.user.organizationId);
+    res.json({ competitors: results.length, newAds: results.reduce((s, r) => s + r.newAds.length, 0) });
+  });
+
+  api.get('/adspy/ads', canViewAdspy, (req, res) => {
+    res.json(listAds(req.user.organizationId, {
+      competitorId: req.query.competitorId, status: req.query.status,
+      saved: req.query.saved, q: req.query.q, sort: req.query.sort,
+    }));
+  });
+  api.get('/adspy/winning', canViewAdspy, (req, res) => {
+    res.json(winningAds(req.user.organizationId, Number(req.query.limit) || 24));
+  });
+  api.get('/adspy/insights', canViewAdspy, (req, res) => {
+    res.json(insights(req.user.organizationId, req.query.competitorId || null));
+  });
+  api.post('/adspy/ads/:id/save', canViewAdspy, (req, res) => {
+    const ad = db.adCreatives.get(req.params.id);
+    if (!ad || ad.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    res.json(toggleSaved(ad, { saved: req.body.saved, tags: req.body.tags }));
   });
 
   // ── Notifications ─────────────────────────────────────────────────────────

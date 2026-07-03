@@ -9,6 +9,7 @@ import { applyEnvCredentials } from './store/envCredentials.js';
 import { startReminderScheduler } from './core/reminders.js';
 import { startDailyReportScheduler } from './core/dailyReport.js';
 import { startSlaMonitor } from './core/sla.js';
+import { startAdSpyScheduler } from './core/adspy.js';
 import { initPush } from './core/push.js';
 import { logger } from './logger.js';
 
@@ -25,6 +26,7 @@ attachRealtime(server);
 startReminderScheduler();
 startDailyReportScheduler();
 startSlaMonitor();
+startAdSpyScheduler();
 
 /** First non-internal IPv4 — the address phones on the same Wi-Fi can reach. */
 function lanAddress() {
