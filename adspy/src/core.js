@@ -1,18 +1,16 @@
-import { db } from '../store/db.js';
-import { bus } from './eventBus.js';
-import { notify } from './notifications.js';
-import { can, PERMISSIONS } from './rbac.js';
-import { config } from '../config.js';
-import { logger } from '../logger.js';
+import { db } from './store.js';
+import { broadcastPush } from './push.js';
+import { config } from './config.js';
+import { logger } from './logger.js';
 
-const log = logger('adspy');
+const log = logger('core');
 
 /**
- * Facebook / Meta competitor Ad-spy.
+ * Facebook / Meta competitor ad-spy core.
  *
  * Legitimate competitive intelligence built on the public **Meta Ad Library
  * API** (`graph.facebook.com/…/ads_archive`) — not scraping. Two modes, chosen
- * automatically (same philosophy as the channel adapters):
+ * automatically:
  *
  *   • LIVE  — when `META_AD_LIBRARY_TOKEN` is set, we query the real Ad Library.
  *   • MOCK  — otherwise we generate a stable, deterministic demo dataset so the
@@ -29,11 +27,7 @@ const DAY = 86400000;
 const GRAPH_VERSION = 'v19.0';
 
 /** LIVE when an Ad Library access token is configured. */
-export const liveEnabled = () => !!config.adspy.token;
-
-export function adspyConfig() {
-  return { live: liveEnabled(), defaultCountry: config.adspy.defaultCountry };
-}
+export const liveEnabled = () => !!config.adLibraryToken;
 
 // ── Derived metrics ───────────────────────────────────────────────────────────
 export const daysRunning = (ad) =>
@@ -52,16 +46,15 @@ export function decorateAd(ad) {
 }
 
 // ── Watchlist CRUD ─────────────────────────────────────────────────────────────
-export function listCompetitors(organizationId) {
-  return db.adCompetitors
-    .filter((c) => c.organizationId === organizationId)
+export function listCompetitors() {
+  return db.competitors.all()
     .map((c) => ({ ...c, ...competitorStats(c.id) }))
     .sort((a, b) => (a.pageName || '').localeCompare(b.pageName || ''));
 }
 
 /** Roll-up stats shown on each watchlist row. */
 export function competitorStats(competitorId) {
-  const ads = db.adCreatives.filter((a) => a.competitorId === competitorId);
+  const ads = db.ads.filter((a) => a.competitorId === competitorId);
   const active = ads.filter((a) => a.status === 'active');
   const now = Date.now();
   const newThisWeek = ads.filter((a) => now - new Date(a.firstFetchedAt || a.createdAt).getTime() < 7 * DAY).length;
@@ -72,22 +65,19 @@ export function competitorStats(competitorId) {
   return { activeAds: active.length, totalAds: ads.length, newThisWeek, longestRunning: longest, avgDaysRunning: avg };
 }
 
-export function addCompetitor(organizationId, { pageName, pageId, country }, createdBy) {
+export function addCompetitor({ pageName, pageId, country }) {
   const name = String(pageName || '').trim();
   if (!name) throw new Error('pageName required');
-  const existing = db.adCompetitors.find(
-    (c) => c.organizationId === organizationId &&
-      (c.pageName.toLowerCase() === name.toLowerCase() || (pageId && c.pageId === pageId)),
+  const existing = db.competitors.find(
+    (c) => c.pageName.toLowerCase() === name.toLowerCase() || (pageId && c.pageId === pageId),
   );
   if (existing) throw new Error('คู่แข่งรายนี้อยู่ในรายการเฝ้าดูแล้ว');
-  return db.adCompetitors.insert({
-    organizationId,
+  return db.competitors.insert({
     pageName: name,
     pageId: String(pageId || '').trim() || null,
-    country: String(country || config.adspy.defaultCountry || 'TH').toUpperCase().slice(0, 2),
+    country: String(country || config.defaultCountry || 'TH').toUpperCase().slice(0, 2),
     alertsEnabled: true,
     lastCheckedAt: null,
-    createdBy: createdBy || null,
   });
 }
 
@@ -97,17 +87,17 @@ export function updateCompetitor(competitor, patch) {
   if (patch.pageId !== undefined) p.pageId = String(patch.pageId).trim() || null;
   if (patch.country !== undefined) p.country = String(patch.country).toUpperCase().slice(0, 2);
   if (patch.alertsEnabled !== undefined) p.alertsEnabled = !!patch.alertsEnabled;
-  return db.adCompetitors.update(competitor.id, p);
+  return db.competitors.update(competitor.id, p);
 }
 
 export function removeCompetitor(competitor) {
-  db.adCreatives.filter((a) => a.competitorId === competitor.id).forEach((a) => db.adCreatives.remove(a.id));
-  db.adCompetitors.remove(competitor.id);
+  db.ads.filter((a) => a.competitorId === competitor.id).forEach((a) => db.ads.remove(a.id));
+  db.competitors.remove(competitor.id);
 }
 
 // ── Ad feed / swipe file ────────────────────────────────────────────────────────
-export function listAds(organizationId, { competitorId, status, saved, q, sort } = {}) {
-  let ads = db.adCreatives.filter((a) => a.organizationId === organizationId);
+export function listAds({ competitorId, status, saved, q, sort } = {}) {
+  let ads = db.ads.all();
   if (competitorId) ads = ads.filter((a) => a.competitorId === competitorId);
   if (status && status !== 'all') ads = ads.filter((a) => a.status === status);
   if (saved === true || saved === 'true') ads = ads.filter((a) => a.saved);
@@ -125,15 +115,15 @@ export function listAds(organizationId, { competitorId, status, saved, q, sort }
   return decorated.sort(sorters[sort] || sorters.longest);
 }
 
-export function winningAds(organizationId, limit = 24) {
-  return listAds(organizationId, { status: 'active', sort: 'winning' }).slice(0, limit);
+export function winningAds(limit = 24) {
+  return listAds({ status: 'active', sort: 'winning' }).slice(0, limit);
 }
 
 export function toggleSaved(ad, { saved, tags } = {}) {
   const patch = {};
   if (saved !== undefined) patch.saved = !!saved;
   if (Array.isArray(tags)) patch.savedTags = tags.map((t) => String(t).trim()).filter(Boolean);
-  return decorateAd(db.adCreatives.update(ad.id, patch));
+  return decorateAd(db.ads.update(ad.id, patch));
 }
 
 // ── Copy / creative insights ────────────────────────────────────────────────────
@@ -144,12 +134,13 @@ const STOPWORDS = new Set([
 ]);
 
 /**
- * Aggregate creative intelligence across a competitor's ads (or the whole org):
- * the words / hooks they lean on, the CTAs and platforms they favour, how their
- * creatives split by media type & longevity, and their launch cadence.
+ * Aggregate creative intelligence across a competitor's ads (or the whole
+ * watchlist): the words / hooks they lean on, the CTAs and platforms they
+ * favour, how their creatives split by media type & longevity, and their
+ * launch cadence.
  */
-export function insights(organizationId, competitorId) {
-  let ads = db.adCreatives.filter((a) => a.organizationId === organizationId);
+export function insights(competitorId) {
+  let ads = db.ads.all();
   if (competitorId) ads = ads.filter((a) => a.competitorId === competitorId);
 
   const words = {}, ctas = {}, platforms = {}, mediaTypes = {}, cadence = {};
@@ -194,8 +185,8 @@ export function insights(organizationId, competitorId) {
 // ── Refresh: fetch → diff → alert ────────────────────────────────────────────────
 /**
  * Fetch a competitor's current active ads (live or mock), upsert them, and —
- * for genuinely new ads — raise an in-app + Web Push alert to the org's analysts
- * so a fresh competitor campaign never goes unnoticed.
+ * for genuinely new ads — broadcast a Web Push alert so a fresh competitor
+ * campaign never goes unnoticed.
  */
 export async function refreshCompetitor(competitor) {
   let incoming = [];
@@ -203,11 +194,11 @@ export async function refreshCompetitor(competitor) {
     incoming = liveEnabled() ? await fetchFromLibrary(competitor) : generateMockAds(competitor);
   } catch (e) {
     log.warn(`refresh ${competitor.pageName} failed: ${e.message}`);
-    db.adCompetitors.update(competitor.id, { lastCheckedAt: new Date().toISOString(), lastError: e.message });
+    db.competitors.update(competitor.id, { lastCheckedAt: new Date().toISOString(), lastError: e.message });
     return { newAds: [], error: e.message };
   }
 
-  const existing = db.adCreatives.filter((a) => a.competitorId === competitor.id);
+  const existing = db.ads.filter((a) => a.competitorId === competitor.id);
   const byExternal = new Map(existing.map((a) => [a.externalId, a]));
   const seen = new Set();
   const newAds = [];
@@ -217,10 +208,9 @@ export async function refreshCompetitor(competitor) {
     seen.add(ad.externalId);
     const prev = byExternal.get(ad.externalId);
     if (prev) {
-      db.adCreatives.update(prev.id, { ...ad, id: prev.id, status: 'active', lastSeenActive: nowIso });
+      db.ads.update(prev.id, { ...ad, id: prev.id, status: 'active', lastSeenActive: nowIso });
     } else {
-      const row = db.adCreatives.insert({
-        organizationId: competitor.organizationId,
+      const row = db.ads.insert({
         competitorId: competitor.id,
         ...ad,
         status: 'active',
@@ -235,37 +225,27 @@ export async function refreshCompetitor(competitor) {
   // Ads we've stored but no longer see → mark inactive (they stopped running).
   for (const a of existing) {
     if (!seen.has(a.externalId) && a.status === 'active') {
-      db.adCreatives.update(a.id, { status: 'inactive' });
+      db.ads.update(a.id, { status: 'inactive' });
     }
   }
 
-  db.adCompetitors.update(competitor.id, { lastCheckedAt: nowIso, lastError: null });
+  db.competitors.update(competitor.id, { lastCheckedAt: nowIso, lastError: null });
 
-  if (newAds.length && competitor.alertsEnabled) alertNewAds(competitor, newAds);
-  if (newAds.length) log.info(`${competitor.pageName}: ${newAds.length} new ad(s)`);
-  return { newAds, error: null };
-}
-
-/** Ping every analyst (users who can view analytics) about new competitor ads. */
-function alertNewAds(competitor, newAds) {
-  const first = newAds[0];
-  const preview = String(first.headline || first.body || '').slice(0, 60);
-  const analysts = db.users.filter(
-    (u) => u.organizationId === competitor.organizationId &&
-      u.status !== 'disabled' && can(u, PERMISSIONS.VIEW_ANALYTICS));
-  for (const u of analysts) {
-    notify(u.id, {
-      type: 'adspy_new_ad',
+  if (newAds.length && competitor.alertsEnabled) {
+    const first = newAds[0];
+    const preview = String(first.headline || first.body || '').slice(0, 60);
+    broadcastPush({
       title: `🕵️ ${competitor.pageName} ปล่อยโฆษณาใหม่ ${newAds.length} ชิ้น`,
       body: preview ? `“${preview}”` : 'มีครีเอทีฟใหม่ในคลังโฆษณา Facebook',
     });
   }
-  bus.emit('adspy:new-ads', { competitor, count: newAds.length });
+  if (newAds.length) log.info(`${competitor.pageName}: ${newAds.length} new ad(s)`);
+  return { newAds, error: null };
 }
 
-export async function refreshOrganization(organizationId) {
+export async function refreshAll() {
   const results = [];
-  for (const c of db.adCompetitors.filter((c) => c.organizationId === organizationId)) {
+  for (const c of db.competitors.all()) {
     results.push({ competitorId: c.id, ...(await refreshCompetitor(c)) });
   }
   return results;
@@ -286,7 +266,7 @@ async function fetchFromLibrary(competitor) {
     ad_reached_countries: JSON.stringify([competitor.country || 'TH']),
     fields,
     limit: '50',
-    access_token: config.adspy.token,
+    access_token: config.adLibraryToken,
   });
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/ads_archive?${params}`);
   if (!res.ok) throw new Error(`Ad Library ${res.status}`);
@@ -358,42 +338,28 @@ function generateMockAds(competitor) {
   return ads;
 }
 
-/**
- * Seed a competitor's demo creatives synchronously (used by the demo seeder so
- * the dashboard has data on first boot, without an async refresh). No-op in
- * LIVE mode — real ads arrive via the scheduler / manual refresh.
- */
-export function seedCompetitorCreatives(competitor) {
-  if (liveEnabled()) return 0;
-  const nowIso = new Date().toISOString();
-  const ads = generateMockAds(competitor);
-  for (const ad of ads) {
-    db.adCreatives.insert({
-      organizationId: competitor.organizationId,
-      competitorId: competitor.id,
-      ...ad,
-      status: 'active',
-      saved: false,
-      savedTags: [],
-      firstFetchedAt: nowIso,
-      lastSeenActive: nowIso,
-    });
+// ── Demo seed ─────────────────────────────────────────────────────────────────
+/** First boot with an empty store: watch a few demo pages so the UI has data. */
+export async function seedIfEmpty() {
+  if (!db.isEmpty() || liveEnabled()) return;
+  log.info('seeding demo watchlist...');
+  for (const [pageName, pageId] of [
+    ['Sansiri', '112233445566'],
+    ['AP Thailand', '223344556677'],
+    ['LPN Development', '334455667788'],
+  ]) {
+    await refreshCompetitor(addCompetitor({ pageName, pageId }));
   }
-  db.adCompetitors.update(competitor.id, { lastCheckedAt: nowIso });
-  return ads.length;
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 let timer = null;
 /** Periodically refresh every watched competitor so new ads surface on their own. */
-export function startAdSpyScheduler(intervalMs = 6 * 3600 * 1000) {
+export function startScheduler(intervalMs = config.refreshHours * 3600 * 1000) {
   if (timer) return;
-  const run = async () => {
-    for (const c of db.adCompetitors.all()) {
-      try { await refreshCompetitor(c); } catch (e) { log.warn(`scheduled refresh: ${e.message}`); }
-    }
-  };
-  timer = setInterval(run, intervalMs);
+  timer = setInterval(() => {
+    refreshAll().catch((e) => log.warn(`scheduled refresh: ${e.message}`));
+  }, intervalMs);
   if (timer.unref) timer.unref();
-  log.info(`ad-spy scheduler every ${Math.round(intervalMs / 3600000)}h (${liveEnabled() ? 'LIVE' : 'MOCK'} mode)`);
+  log.info(`scheduler every ${Math.round(intervalMs / 3600000)}h (${liveEnabled() ? 'LIVE' : 'MOCK'} mode)`);
 }

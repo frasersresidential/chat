@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Ad Spy — Facebook Competitor Ads</title>
+  <meta name="theme-color" content="#0e1117" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">🕵️ <span>Ad Spy</span><small>Facebook competitor ads</small></div>
+      <div class="topbar-right">
+        <span id="modePill" class="pill"></span>
+        <button id="pushBtn" class="btn ghost" title="เปิดแจ้งเตือนเมื่อคู่แข่งปล่อยแอดใหม่">🔔 แจ้งเตือน</button>
+        <button id="refreshBtn" class="btn ghost">↻ อัปเดตทั้งหมด</button>
+        <button id="logoutBtn" class="btn ghost" title="ออกจากระบบ">⏏</button>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+  <script src="/app.js" type="module"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW register failed', e));
+      });
+    }
+  </script>
+</body>
+</html>

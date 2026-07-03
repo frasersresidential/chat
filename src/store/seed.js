@@ -4,7 +4,6 @@ import { hashPassword } from '../core/auth.js';
 import { defaultBusinessHours } from '../core/businessHours.js';
 import { defaultDailyReport } from '../core/dailyReport.js';
 import { defaultSla } from '../core/sla.js';
-import { seedCompetitorCreatives } from '../core/adspy.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
@@ -162,18 +161,6 @@ export function seedIfEmpty() {
   auto('welcome', 'สวัสดีค่ะ ขอบคุณที่ติดต่อเข้ามานะคะ 🙏 ทีมงานกำลังรีบมาดูแลค่ะ');
   auto('away', 'ขณะนี้อยู่นอกเวลาทำการค่ะ ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุดนะคะ 😊');
   auto('keyword', 'ราคาเริ่มต้นที่ 2.5 ล้านบาทค่ะ สนใจห้องแบบไหนดีคะ เดี๋ยวทีมขายส่งรายละเอียดให้นะคะ', ['ราคา', 'เท่าไหร่', 'price']);
-
-  // ── Competitor Ad-spy watchlist (demo, mock creatives) ───────────────────
-  const competitor = (id, pageName, pageId) => {
-    const c = db.adCompetitors.insert({
-      id, organizationId: O, pageName, pageId, country: 'TH',
-      alertsEnabled: true, lastCheckedAt: null, createdBy: 'system',
-    });
-    seedCompetitorCreatives(c);
-  };
-  competitor('adcmp_sansiri', 'Sansiri', '112233445566');
-  competitor('adcmp_ap', 'AP Thailand', '223344556677');
-  competitor('adcmp_lpn', 'LPN Development', '334455667788');
 
   log.info('seed complete: 1 org, ' + db.users.all().length + ' users, ' +
     db.channelAccounts.all().length + ' channel accounts, ' +
