@@ -340,9 +340,9 @@ body[data-pattern="dots"] {
 
 /* ── iPad / tablet: scale up the whole experience for a larger touch screen ── */
 @media (min-width: 768px) {
-  #app { max-width: 640px; padding: 48px 28px 60px; }
+  #app { max-width: 720px; padding: 48px 32px 60px; }
   .overline { font-size: 13px; padding: 7px 22px; }
-  .hero h1 { font-size: 33px; }
+  .hero h1 { font-size: 34px; }
   .plays { font-size: 16px; margin-top: 16px; padding: 8px 20px; }
   .plays b { font-size: 19px; }
 
@@ -367,24 +367,46 @@ body[data-pattern="dots"] {
   .tface.front .art { font-size: 38px; }
   .tface.front .nm { font-size: 11px; }
 
-  /* Registration form */
-  .entry-card { max-width: 520px; padding: 36px 40px 32px; gap: 20px; border-radius: calc(var(--radius) * 1.6); }
-  .entry-title { font-size: 26px; }
+  /* Registration form — two-column field grid so it fills the tablet width */
+  .entry-card {
+    max-width: 620px; padding: 40px 44px 36px; border-radius: calc(var(--radius) * 1.6);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; align-items: start;
+  }
+  .entry-title, .entry-sub, .field.wide, .entry-err, .cta.block { grid-column: 1 / -1; }
+  .entry-title { font-size: 27px; }
   .entry-sub { font-size: 15px; margin-top: -10px; }
-  .field { gap: 8px; }
   .field > span { font-size: 15px; }
   .field input { font-size: 17px; padding: 15px 17px; }
   .combo-opt { font-size: 16px; padding: 14px 16px; }
   .entry-err { font-size: 15px; padding: 12px 14px; }
 
-  .sheet { max-width: 460px; padding: 38px 32px 30px; }
-  .prize-name { font-size: 26px; }
+  .sheet { max-width: 480px; padding: 40px 34px 32px; }
+  .prize-name { font-size: 27px; }
   .fortune-slip .f-text { font-size: 14px; }
   .coupon .c-code { font-size: 23px; }
 }
 
-/* Landscape iPad: keep the wheel from overflowing the shorter height */
-@media (min-width: 768px) and (orientation: landscape) and (max-height: 840px) {
-  #app { padding-top: 28px; }
-  .wheel-wrap { width: min(52vh, 400px); }
+/* ── iPad landscape: split-screen kiosk layout (branding left, content right) ─ */
+@media (min-width: 960px) and (orientation: landscape) {
+  #app {
+    max-width: 1160px; min-height: 100vh; padding: 44px 52px;
+    display: grid; align-content: center; column-gap: 56px;
+    grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.05fr);
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "hero content" "foot content";
+  }
+  .hero { grid-area: hero; align-self: center; text-align: left; margin: 0; }
+  .hero h1 { font-size: 42px; line-height: 1.25; }
+  .hero .hairline { margin: 18px 0 14px; }
+  .plays { margin-top: 20px; }
+
+  #entry, #playArea { grid-area: content; align-self: center; width: 100%; }
+  .entry { justify-content: stretch; margin-top: 0; }
+  .entry-card { max-width: none; }
+
+  .foot { grid-area: foot; align-self: end; text-align: left; margin-top: 24px; }
+
+  /* Game view fits the content column height without overflowing */
+  .wheel-wrap { width: min(56vh, 460px); }
+  .shrine { padding: 90px 0 0; }
 }
