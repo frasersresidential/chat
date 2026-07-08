@@ -93,37 +93,31 @@ body[data-pattern="dots"] {
 .cta.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* ── เกม 1: วงล้อ ─────────────────────────────────────────────────────────── */
-.wheel-wrap { position: relative; width: min(86vw, 330px); margin: 10px auto 0; }
+/* rim / bulbs / hub / pointer are all drawn inside the SVG (theme-shaded);
+   only the segment group (#wheelRot) spins. */
+.wheel-wrap { position: relative; width: min(88vw, 344px); margin: 10px auto 0; }
 .wheel-wrap svg {
-  width: 100%; display: block; border-radius: 50%;
-  border: calc(var(--bw) * 1.6) solid var(--ink);
-  box-shadow: var(--pop-lg);
-  transition: transform 4.6s cubic-bezier(.12,.65,.1,1); will-change: transform;
-  background: var(--surface);
+  width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 18px 26px rgba(10, 10, 16, .35));
 }
+#wheelRot { transition: transform 4.6s cubic-bezier(.12,.65,.1,1); will-change: transform; }
 @media (prefers-reduced-motion: reduce) {
-  .wheel-wrap svg { transition-duration: .8s; }
-}
-.wheel-wrap .pointer {
-  position: absolute; top: -16px; left: 50%; transform: translateX(-50%); z-index: 3;
-  width: 0; height: 0;
-  border-left: 15px solid transparent; border-right: 15px solid transparent;
-  border-top: 26px solid var(--accent);
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
+  #wheelRot { transition-duration: .8s; }
 }
 .hub {
+  /* transparent click target over the SVG hub — the visual lives in the SVG */
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 2;
-  width: 88px; height: 88px; border-radius: 50%; cursor: pointer;
+  width: 96px; height: 96px; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  background: var(--highlight); color: var(--on-highlight);
-  border: calc(var(--bw) * 1.6) solid var(--ink);
-  box-shadow: var(--pop-sm);
-  transition: transform .12s, box-shadow .12s;
+  background: none; border: none;
+  color: var(--highlight);
   font-family: inherit;
+  transition: transform .12s;
 }
-.hub span { font-size: 18px; font-weight: 800; letter-spacing: .06em; }
-.hub:active { transform: translate(-50%,-50%) scale(.95); }
+.hub span { font-size: 19px; font-weight: 800; letter-spacing: .1em; margin-right: -.1em; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.hub:active { transform: translate(-50%,-50%) scale(.94); }
 .hub:disabled { opacity: .55; cursor: not-allowed; }
+.hub:focus-visible { outline: 3px solid var(--accent); outline-offset: -6px; }
 
 /* ── เกม 2: เซียมซี ───────────────────────────────────────────────────────── */
 .shrine { display: flex; justify-content: center; padding: 104px 0 0; }

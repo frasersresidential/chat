@@ -171,10 +171,10 @@ export function seedIfEmpty() {
     prizes: [
       { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#c9a557', couponPrefix: 'LUCKY500' },
       { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#da291c', couponPrefix: 'LUCKY100' },
-      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#333f48', couponPrefix: 'LUCKY50' },
-      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#5c6670', couponPrefix: 'FREESHIP' },
-      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#97231c', couponPrefix: 'GIFT' },
-      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#22282e' },
+      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#f6efe3', couponPrefix: 'LUCKY50' },
+      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#da291c', couponPrefix: 'FREESHIP' },
+      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#f6efe3', couponPrefix: 'GIFT' },
+      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#97231c' },
     ],
   });
 

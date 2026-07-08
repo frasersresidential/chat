@@ -87,41 +87,96 @@ function brightness(hex) {
   return ((v >> 16) & 255) * 0.299 + ((v >> 8) & 255) * 0.587 + (v & 255) * 0.114;
 }
 
+/** Darken (amt<0) or lighten (amt>0) a hex color for the 3D shading. */
+function shade(hex, amt) {
+  const v = parseInt(hex.slice(1), 16);
+  const ch = (x) => Math.round(amt < 0 ? x * (1 + amt) : x + (255 - x) * amt);
+  const r = ch((v >> 16) & 255), g = ch((v >> 8) & 255), b = ch(v & 255);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+// Carnival-style 3D wheel: thick shaded rim with light bulbs, glossy segments
+// with white separators, dark glossy hub and an integrated teardrop pointer.
+// All colors come from the campaign theme, so it restyles from the admin.
 function buildWheel() {
   const prizes = state.campaign.prizes;
-  const themeColors = state.campaign.theme?.colors || {};
-  const ink = themeColors.ink || '#23212b';
-  const surface = themeColors.surface || '#ffffff';
+  const tc = state.campaign.theme?.colors || {};
+  const surface = tc.surface || '#ffffff';
+  const accent = tc.accent || '#da291c';
+  const accent2 = tc.accent2 || '#333f48';
+  const highlight = tc.highlight || '#c9a557';
   const n = prizes.length;
   const seg = 360 / n;
-  const R = 150, r = 140;
+  const C = 160, segR = 130;
   const pt = (deg, rad) => {
     const a = (deg * Math.PI) / 180;
-    return [R + rad * Math.sin(a), R - rad * Math.cos(a)];
+    return [C + rad * Math.sin(a), C - rad * Math.cos(a)];
   };
-  const parts = prizes.map((p, i) => {
-    const [x0, y0] = pt(i * seg, r);
-    const [x1, y1] = pt((i + 1) * seg, r);
+  const segs = prizes.map((p, i) => {
+    const [x0, y0] = pt(i * seg, segR);
+    const [x1, y1] = pt((i + 1) * seg, segR);
     const mid = (i + 0.5) * seg;
-    const [tx, ty] = pt(mid, 90);
-    const [dx, dy] = pt(i * seg, 122); // stud on each segment boundary
+    const [tx, ty] = pt(mid, 89);
     const color = p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
-    const label = p.label.length > 16 ? p.label.slice(0, 15) + '…' : p.label;
-    const textFill = brightness(color) > 130 ? '#23212b' : '#ffffff';
+    const label = p.label.length > 18 ? p.label.slice(0, 17) + '…' : p.label;
+    // Shrink long labels so they stay inside the ~80px radial span (hub → rim).
+    const fs = label.length > 14 ? 9 : label.length > 11 ? 10.5 : 12;
+    const textFill = brightness(color) > 130 ? shade(accent, -0.15) : '#ffffff';
     // Radial labels; flip the left half 180° so no label reads upside-down.
     const textRot = mid > 180 ? mid + 90 : mid - 90;
     return `
-      <path d="M${R},${R} L${x0.toFixed(2)},${y0.toFixed(2)} A${r} ${r} 0 ${seg > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z"
-            fill="${color}" stroke="${ink}" stroke-width="2" opacity="${p.soldOut ? 0.35 : 1}"/>
-      <circle cx="${dx.toFixed(2)}" cy="${dy.toFixed(2)}" r="2.2" fill="${surface}" stroke="${ink}" stroke-width="1"/>
+      <path d="M${C},${C} L${x0.toFixed(2)},${y0.toFixed(2)} A${segR} ${segR} 0 ${seg > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z"
+            fill="${color}" stroke="${surface}" stroke-width="2.5" opacity="${p.soldOut ? 0.35 : 1}"/>
       <text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" transform="rotate(${textRot.toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})"
-            text-anchor="middle" dominant-baseline="middle" fill="${textFill}" font-size="11.5"
-            font-weight="600" letter-spacing=".3">${label}</text>`;
-  });
-  $('wheelSvg').innerHTML =
-    `<circle cx="${R}" cy="${R}" r="${r}" fill="${surface}"/>` +
-    parts.join('') +
-    `<circle cx="${R}" cy="${R}" r="52" fill="${surface}" stroke="${ink}" stroke-width="2"/>`;
+            text-anchor="middle" dominant-baseline="middle" fill="${textFill}" font-size="${fs}"
+            font-weight="700" letter-spacing=".3">${label}</text>`;
+  }).join('');
+
+  // 12 light bulbs around the rim.
+  const bulbs = Array.from({ length: 12 }, (_, i) => {
+    const [x, y] = pt(i * 30, 143);
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.4" fill="url(#bulbGrad)" stroke="${shade(accent, -0.5)}" stroke-width=".8"/>`;
+  }).join('');
+
+  const defs = `<defs>
+    <radialGradient id="rimGrad" cx="35%" cy="22%" r="95%">
+      <stop offset="0%" stop-color="${shade(accent, 0.28)}"/>
+      <stop offset="55%" stop-color="${accent}"/>
+      <stop offset="100%" stop-color="${shade(accent, -0.45)}"/>
+    </radialGradient>
+    <radialGradient id="hubGrad" cx="38%" cy="28%" r="85%">
+      <stop offset="0%" stop-color="${shade(accent2, 0.35)}"/>
+      <stop offset="60%" stop-color="${accent2}"/>
+      <stop offset="100%" stop-color="${shade(accent2, -0.55)}"/>
+    </radialGradient>
+    <radialGradient id="bulbGrad" cx="35%" cy="30%" r="85%">
+      <stop offset="0%" stop-color="#fff8e1"/>
+      <stop offset="45%" stop-color="${highlight}"/>
+      <stop offset="100%" stop-color="${shade(highlight, -0.35)}"/>
+    </radialGradient>
+    <radialGradient id="glossGrad" cx="38%" cy="24%" r="80%">
+      <stop offset="0%" stop-color="rgba(255,255,255,.32)"/>
+      <stop offset="45%" stop-color="rgba(255,255,255,.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,.14)"/>
+    </radialGradient>
+  </defs>`;
+
+  $('wheelSvg').innerHTML = defs +
+    `<circle cx="${C}" cy="${C}" r="${segR}" fill="${surface}"/>` +
+    `<g id="wheelRot" style="transform-origin:${C}px ${C}px">${segs}</g>` +
+    `<circle cx="${C}" cy="${C}" r="${segR}" fill="url(#glossGrad)" pointer-events="none"/>` +
+    `<circle cx="${C}" cy="${C}" r="143" fill="none" stroke="url(#rimGrad)" stroke-width="27"/>` +
+    `<circle cx="${C}" cy="${C}" r="156.5" fill="none" stroke="${shade(accent, -0.55)}" stroke-width="2"/>` +
+    `<circle cx="${C}" cy="${C}" r="129.5" fill="none" stroke="${highlight}" stroke-width="1.4" opacity=".85"/>` +
+    bulbs +
+    `<path d="M${C} 46 C${C + 17} 76 ${C + 19} 102 ${C} 116 C${C - 19} 102 ${C - 17} 76 ${C} 46 Z"
+           fill="url(#hubGrad)" stroke="${highlight}" stroke-width="2"/>` +
+    `<circle cx="${C}" cy="${C}" r="48" fill="url(#hubGrad)" stroke="${highlight}" stroke-width="3"/>` +
+    `<circle cx="${C}" cy="${C}" r="41" fill="none" stroke="${highlight}" stroke-width="1" opacity=".55"/>`;
+
+  // Keep the current rotation when the wheel is rebuilt (e.g. theme change).
+  const rot = document.getElementById('wheelRot');
+  if (rot && state.rot) rot.style.transform = `rotate(${state.rot}deg)`;
 }
 
 async function spinWheel() {
@@ -137,8 +192,8 @@ async function spinWheel() {
     const target = (360 - (result.prizeIndex + 0.5) * seg + jitter + 360) % 360;
     const current = ((state.rot % 360) + 360) % 360;
     state.rot += 360 * 5 + ((target - current + 360) % 360);
-    const svg = $('wheelSvg');
-    svg.style.transform = `rotate(${state.rot}deg)`;
+    const rot = document.getElementById('wheelRot');
+    rot.style.transform = `rotate(${state.rot}deg)`;
     let done = false;
     const finish = () => {
       if (done) return;
@@ -147,7 +202,7 @@ async function spinWheel() {
       $('spinBtn').disabled = false;
       showResult(result);
     };
-    svg.addEventListener('transitionend', finish, { once: true });
+    rot.addEventListener('transitionend', finish, { once: true });
     setTimeout(finish, 5200); // fallback if transitionend never fires
   } catch (e) {
     state.busy = false;
