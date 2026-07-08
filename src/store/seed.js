@@ -168,6 +168,15 @@ export function seedIfEmpty() {
       colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
       style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
     },
+    // Entry gate: players fill the form and enter this code before playing.
+    gate: {
+      enabled: true,
+      code: 'FP2024',
+      projects: [
+        'The Grand พระราม 9', 'Golden Neo สุขุมวิท', 'Neo Home บางนา',
+        'Grand Park วิภาวดี', 'Frasers Ville รังสิต', 'The Rich รัชดา',
+      ],
+    },
     prizes: [
       { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#c9a557', couponPrefix: 'LUCKY500' },
       { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#da291c', couponPrefix: 'LUCKY100' },

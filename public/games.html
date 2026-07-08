@@ -18,9 +18,43 @@
       <div class="overline">Lucky Draw</div>
       <h1 id="campaignName">กำลังโหลด…</h1>
       <div class="hairline"></div>
-      <p class="plays">เหลือสิทธิ์อีก <b id="playsLeft">–</b> ครั้งวันนี้</p>
+      <p class="plays" id="playsLine">เหลือสิทธิ์อีก <b id="playsLeft">–</b> ครั้งวันนี้</p>
     </header>
 
+    <!-- ── หน้าแรก: ฟอร์มลงทะเบียนก่อนเล่น ─────────────────────────── -->
+    <section id="entry" class="entry hidden">
+      <form id="entryForm" class="entry-card" autocomplete="off">
+        <h2 class="entry-title">ลงทะเบียนเข้าร่วมกิจกรรม</h2>
+        <p class="entry-sub">กรอกข้อมูลให้ครบถ้วน แล้วกด “ถัดไป” เพื่อเริ่มลุ้นรางวัล</p>
+
+        <label class="field">
+          <span>ชื่อ - นามสกุล</span>
+          <input id="fName" type="text" placeholder="เช่น สมชาย ใจดี" required />
+        </label>
+
+        <label class="field combo" id="projField">
+          <span>โครงการ</span>
+          <input id="fProject" type="text" placeholder="พิมพ์เพื่อค้นหา แล้วเลือกโครงการ" autocomplete="off" required />
+          <div id="projList" class="combo-list hidden"></div>
+        </label>
+
+        <label class="field">
+          <span>แปลง / ยูนิต</span>
+          <input id="fPlot" type="text" placeholder="เช่น A-12" required />
+        </label>
+
+        <label class="field">
+          <span>Code เข้าร่วมกิจกรรม</span>
+          <input id="fCode" type="text" placeholder="กรอกรหัสที่ได้รับจากเจ้าหน้าที่" required />
+        </label>
+
+        <div id="entryErr" class="entry-err hidden"></div>
+        <button type="submit" id="entryNext" class="cta primary block">ถัดไป →</button>
+      </form>
+    </section>
+
+    <!-- ── หน้าเกม (แสดงหลังผ่านฟอร์ม) ─────────────────────────────── -->
+    <div id="playArea" class="hidden">
     <nav class="tabs" id="tabs">
       <button data-game="wheel" class="active">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3v6.6M12 14.4V21M3 12h6.6M14.4 12H21M5.6 5.6l4.7 4.7M13.7 13.7l4.7 4.7M18.4 5.6l-4.7 4.7M10.3 13.7l-4.7 4.7"/></svg>
@@ -69,6 +103,7 @@
         <button id="redealBtn" class="cta hidden">สับไพ่ใหม่</button>
       </section>
     </main>
+    </div><!-- /playArea -->
 
     <footer class="foot">Powered by OmniChat</footer>
   </div>

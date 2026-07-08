@@ -122,8 +122,9 @@ export function todayKey(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
 }
 
-/** Client-safe campaign view — never leak weights or remaining stock counts. */
+/** Client-safe campaign view — never leak weights, stock counts or the gate code. */
 export function publicCampaign(campaign) {
+  const gate = campaign.gate || {};
   return {
     id: campaign.id,
     name: campaign.name,
@@ -131,11 +132,46 @@ export function publicCampaign(campaign) {
     games: campaign.games || GAME_TYPES,
     limitPerDay: campaign.limitPerDay ?? 3,
     theme: sanitizeTheme(campaign.theme || {}, campaign.theme || {}),
+    // gate.code is deliberately omitted — the entry form validates it server-side.
+    gate: { enabled: !!gate.enabled, projects: gate.projects || [] },
     prizes: (campaign.prizes || []).map((p) => ({
       id: p.id, label: p.label, win: p.win !== false, color: p.color || null,
       soldOut: p.stock === 0,
     })),
   };
+}
+
+/** Has this player already passed the entry gate for this campaign? */
+export function hasEntered(campaignId, playerId) {
+  return !!db.gameEntries.find((e) => e.campaignId === campaignId && e.playerId === playerId);
+}
+
+/**
+ * Validate the entry form and, if the access code matches, record the player's
+ * details. Returns { error } on a bad code / missing field, else { ok }.
+ */
+export function enterGate({ campaign, playerId, name, project, plot, code }) {
+  if (!campaign || campaign.active === false) return { error: 'campaign_inactive' };
+  if (!playerId || typeof playerId !== 'string' || playerId.length > 80) return { error: 'bad_player' };
+  const gate = campaign.gate || {};
+  const nm = String(name || '').trim();
+  if (!nm) return { error: 'missing_name' };
+  if (gate.enabled) {
+    const want = String(gate.code || '').trim().toLowerCase();
+    const got = String(code || '').trim().toLowerCase();
+    if (!want) return { error: 'no_code_configured' };
+    if (got !== want) return { error: 'bad_code' };
+  }
+  const existing = db.gameEntries.find((e) => e.campaignId === campaign.id && e.playerId === playerId);
+  const data = {
+    campaignId: campaign.id, playerId,
+    name: nm.slice(0, 120),
+    project: String(project || '').trim().slice(0, 120),
+    plot: String(plot || '').trim().slice(0, 60),
+  };
+  if (existing) db.gameEntries.update(existing.id, data);
+  else db.gameEntries.insert(data);
+  return { ok: true };
 }
 
 export function drawsToday(campaignId, playerId) {
@@ -170,6 +206,9 @@ export function draw({ campaign, playerId, game }) {
   const games = campaign.games || GAME_TYPES;
   if (!games.includes(game)) return { error: 'unknown_game' };
   if (!playerId || typeof playerId !== 'string' || playerId.length > 80) return { error: 'bad_player' };
+
+  // Enforce the entry gate server-side so the form can't be skipped.
+  if (campaign.gate?.enabled && !hasEntered(campaign.id, playerId)) return { error: 'gate_required' };
 
   const limit = campaign.limitPerDay ?? 3;
   if (drawsToday(campaign.id, playerId).length >= limit) return { error: 'daily_limit' };
@@ -213,6 +252,7 @@ export function campaignStats(campaignId) {
     totalDraws: all.length,
     wins: all.filter((d) => d.win).length,
     uniquePlayers: new Set(all.map((d) => d.playerId)).size,
+    entries: db.gameEntries.filter((e) => e.campaignId === campaignId).length,
     byPrize,
   };
 }
@@ -236,6 +276,20 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     games: games.length ? games : GAME_TYPES,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
     theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
+    gate: sanitizeGate(body.gate, existing.gate),
     prizes,
+  };
+}
+
+/** Normalize the entry-gate config (form + access code + project picklist). */
+export function sanitizeGate(body, existing = {}) {
+  const src = body || {};
+  const projects = Array.isArray(src.projects)
+    ? src.projects.map((s) => String(s).trim()).filter(Boolean).slice(0, 300)
+    : (existing.projects || []);
+  return {
+    enabled: body ? !!src.enabled : (existing.enabled ?? false),
+    code: String((src.code ?? existing.code) || '').trim().slice(0, 40),
+    projects,
   };
 }

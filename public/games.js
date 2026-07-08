@@ -26,6 +26,10 @@ const ERRORS = {
   campaign_inactive: 'แคมเปญนี้จบไปแล้ว ขอบคุณที่มาร่วมสนุกกัน 🙏',
   no_prizes: 'รางวัลหมดเกลี้ยงแล้ว ไวกว่านี้มีอีกนะ 😅',
   unknown_game: 'เกมนี้ไม่เปิดให้เล่นในแคมเปญนี้',
+  gate_required: 'กรุณาลงทะเบียนก่อนเริ่มเล่น',
+  bad_code: 'รหัสไม่ถูกต้อง กรุณาตรวจสอบกับเจ้าหน้าที่',
+  missing_name: 'กรุณากรอกชื่อ - นามสกุล',
+  no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
 
 function toast(msg, ms = 2600) {
@@ -361,6 +365,76 @@ function switchGame(game) {
   }
 }
 
+/* ── หน้าแรก: ฟอร์มลงทะเบียน + ค้นหาโครงการ ────────────────────────────────── */
+function setupProjectCombo(projects) {
+  const input = $('fProject');
+  const list = $('projList');
+  const render = (items) => {
+    if (!items.length) { list.classList.add('hidden'); return; }
+    list.innerHTML = items.map((p) => `<button type="button" class="combo-opt">${p.replace(/</g, '&lt;')}</button>`).join('');
+    list.classList.remove('hidden');
+  };
+  const filter = () => {
+    const q = input.value.trim().toLowerCase();
+    render(projects.filter((p) => p.toLowerCase().includes(q)).slice(0, 40));
+  };
+  input.addEventListener('focus', filter);
+  input.addEventListener('input', filter);
+  list.addEventListener('click', (e) => {
+    const opt = e.target.closest('.combo-opt');
+    if (!opt) return;
+    input.value = opt.textContent;
+    list.classList.add('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    if (!$('projField').contains(e.target)) list.classList.add('hidden');
+  });
+}
+
+function showEntry() {
+  $('entry').classList.remove('hidden');
+  $('playArea').classList.add('hidden');
+  $('playsLine').classList.add('hidden');
+}
+
+function showPlay() {
+  $('entry').classList.add('hidden');
+  $('playArea').classList.remove('hidden');
+  $('playsLine').classList.remove('hidden');
+  setPlaysLeft(state.campaign.remainingToday);
+  if (state.campaign.remainingToday <= 0) toast(ERRORS.daily_limit, 4000);
+}
+
+function setupEntryForm() {
+  setupProjectCombo(state.campaign.gate?.projects || []);
+  $('entryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('entryErr');
+    err.classList.add('hidden');
+    const payload = {
+      playerId,
+      name: $('fName').value.trim(),
+      project: $('fProject').value.trim(),
+      plot: $('fPlot').value.trim(),
+      code: $('fCode').value.trim(),
+    };
+    $('entryNext').disabled = true;
+    try {
+      const res = await fetch(`/api/play/${campaignId}/enter`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(ERRORS[data.error] || 'ลงทะเบียนไม่สำเร็จ ลองใหม่อีกครั้ง');
+      showPlay();
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.classList.remove('hidden');
+    } finally {
+      $('entryNext').disabled = false;
+    }
+  });
+}
+
 async function init() {
   try {
     const res = await fetch(`/api/play/${campaignId}?player=${encodeURIComponent(playerId)}`);
@@ -373,7 +447,6 @@ async function init() {
   }
   $('campaignName').textContent = state.campaign.name;
   applyTheme(state.campaign.theme);
-  setPlaysLeft(state.campaign.remainingToday);
 
   // Show only the game skins this campaign enables.
   let first = null;
@@ -395,7 +468,10 @@ async function init() {
     $('cylinder').classList.remove('revealed');
   });
 
-  if (state.campaign.remainingToday <= 0) toast(ERRORS.daily_limit, 4000);
+  // Gate: registered players (or gate-off campaigns) skip straight to the game.
+  setupEntryForm();
+  if (state.campaign.gate?.enabled && !state.campaign.entered) showEntry();
+  else showPlay();
 }
 
 init();

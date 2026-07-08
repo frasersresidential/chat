@@ -1444,6 +1444,8 @@ async function renderGames(main) {
   }
   gamesSelectedId = c.id;
   const t = c.theme || { colors: {}, style: {} };
+  const gate = c.gate || { enabled: false, code: '', projects: [] };
+  const entriesCount = c.stats?.entries ?? 0;
   const dis = manage ? '' : 'disabled';
   const COLOR_LABELS = {
     bg: 'พื้นหลัง', surface: 'พื้นการ์ด', ink: 'ตัวอักษร / เส้นขอบ', muted: 'ตัวอักษรรอง',
@@ -1508,14 +1510,50 @@ async function renderGames(main) {
       ${manage ? '<button class="btn ghost" id="gAddPrize" style="margin-top:10px">+ เพิ่มรางวัล</button>' : ''}
     </div>
 
+    <div class="card">
+      <h3>หน้าลงทะเบียนก่อนเล่น</h3>
+      <p class="muted">เปิดใช้เพื่อบังคับให้ลูกค้ากรอกฟอร์ม (ชื่อ-นามสกุล / โครงการ / แปลง) และใส่ Code ให้ตรงก่อนถึงจะเข้าเล่นได้</p>
+      <div class="form-grid">
+        <div><label>บังคับลงทะเบียน</label><select id="gGateOn" ${dis}>
+          <option value="1" ${gate.enabled ? 'selected' : ''}>เปิด (ต้องกรอกฟอร์ม + Code)</option>
+          <option value="" ${!gate.enabled ? 'selected' : ''}>ปิด (เข้าเล่นได้เลย)</option>
+        </select></div>
+        <div><label>Code เข้าร่วมกิจกรรม</label><input id="gGateCode" value="${esc(gate.code || '')}" placeholder="เช่น FP2024" ${dis} /></div>
+        <div style="grid-column:1/-1"><label>รายชื่อโครงการ (บรรทัดละ 1 โครงการ — ใช้เป็น picklist ค้นหา)</label>
+          <textarea id="gGateProjects" rows="5" ${dis} style="width:100%;font-family:inherit;padding:10px;border-radius:8px;border:1px solid var(--border,#3a3a4a);background:var(--card,#1b1b24);color:inherit">${esc((gate.projects || []).join('\n'))}</textarea></div>
+      </div>
+    </div>
+
     <div class="card"><h3>สถิติ</h3>
-      <p>เล่นทั้งหมด <b>${c.stats?.totalDraws ?? 0}</b> ครั้ง · ถูกรางวัล <b>${c.stats?.wins ?? 0}</b> ครั้ง · ผู้เล่น <b>${c.stats?.uniquePlayers ?? 0}</b> คน</p>
+      <p>ลงทะเบียน <b>${c.stats?.entries ?? entriesCount}</b> คน · เล่นทั้งหมด <b>${c.stats?.totalDraws ?? 0}</b> ครั้ง · ถูกรางวัล <b>${c.stats?.wins ?? 0}</b> ครั้ง · ผู้เล่น <b>${c.stats?.uniquePlayers ?? 0}</b> คน</p>
+      <button class="btn ghost" id="gViewEntries" style="margin-top:8px">ดูรายชื่อผู้ลงทะเบียน + ผลรางวัล</button>
+      <div id="gEntriesBox" style="margin-top:12px"></div>
     </div>
 
     ${manage ? '<button class="btn" id="gSave">บันทึกแคมเปญ</button> <span id="gSaveMsg" class="muted"></span>' : ''}
   </div>`;
 
   $('#gSel').onchange = () => { gamesSelectedId = $('#gSel').value; renderGames(main); };
+
+  $('#gViewEntries').onclick = async () => {
+    const box = $('#gEntriesBox');
+    box.innerHTML = '<p class="muted">กำลังโหลด…</p>';
+    try {
+      const { draws } = await api('/games/campaigns/' + c.id + '/draws');
+      if (!draws.length) { box.innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; return; }
+      box.innerHTML = `<table><thead><tr><th>เวลา</th><th>ชื่อ-นามสกุล</th><th>โครงการ</th><th>แปลง</th><th>เกม</th><th>ผล</th><th>โค้ด</th></tr></thead>
+        <tbody>${draws.map((d) => `<tr>
+          <td>${new Date(d.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+          <td>${esc(d.player?.name || '—')}</td>
+          <td>${esc(d.player?.project || '—')}</td>
+          <td>${esc(d.player?.plot || '—')}</td>
+          <td>${esc({ wheel: 'วงล้อ', sticks: 'เซียมซี', cards: 'เปิดไพ่' }[d.game] || d.game)}</td>
+          <td>${d.win ? '<span class="pill">ได้รางวัล</span>' : '—'}</td>
+          <td>${d.couponCode ? `<code>${esc(d.couponCode)}</code>` : '—'}</td>
+        </tr>`).join('')}</tbody></table>`;
+    } catch (e) { box.innerHTML = `<p class="muted">โหลดไม่สำเร็จ: ${esc(e.message)}</p>`; }
+  };
+
   if (!manage) return;
 
   $('#gNew').onclick = createGameCampaign(main);
@@ -1566,6 +1604,11 @@ async function renderGames(main) {
           preset: $('#gPresetVal').value,
           colors,
           style: { radius: Number($('#gRadius').value), borderWidth: Number($('#gBorder').value), shadow: $('#gShadow').value, pattern: $('#gPattern').value },
+        },
+        gate: {
+          enabled: !!$('#gGateOn').value,
+          code: $('#gGateCode').value.trim(),
+          projects: $('#gGateProjects').value.split('\n').map((s) => s.trim()).filter(Boolean),
         },
         prizes,
       }) });

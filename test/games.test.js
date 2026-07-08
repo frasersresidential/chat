@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/store/db.js';
 import { seedIfEmpty } from '../src/store/seed.js';
-import { draw, publicCampaign, remainingToday, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS } from '../src/core/games.js';
+import { draw, publicCampaign, remainingToday, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS, enterGate, hasEntered } from '../src/core/games.js';
 
 db._reset();
 seedIfEmpty();
@@ -24,7 +24,11 @@ test('public view never leaks weights or stock counts', () => {
   }
 });
 
+// The seeded campaign gates on a code, so register these players first.
+const enter = (id) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
+
 test('a draw returns a prize from the pool and flavour matches the game', () => {
+  ['p1', 'p2', 'p3'].forEach(enter);
   const wheel = draw({ campaign: campaign(), playerId: 'p1', game: 'wheel' });
   assert.ok(!wheel.error);
   assert.ok(campaign().prizes.some((p) => p.id === wheel.prize.id));
@@ -59,6 +63,7 @@ test('winning draws get a coupon code, losing draws do not', () => {
 });
 
 test('daily play limit is enforced per player', () => {
+  enter('limited'); enter('someone_else');
   const c = campaign();
   const limit = c.limitPerDay;
   for (let i = 0; i < limit; i++) {
@@ -104,6 +109,40 @@ test('theme: survives a campaign save round-trip and reaches the public view', (
   const view = publicCampaign(row);
   assert.equal(view.theme.colors.highlight, '#ffeecc');
   assert.equal(view.theme.style.shadow, THEME_PRESETS.luxe.style.shadow);
+});
+
+test('gate: public view exposes projects but never the access code', () => {
+  const view = publicCampaign(campaign());
+  assert.equal(view.gate.enabled, true);
+  assert.ok(view.gate.projects.length > 0);
+  assert.equal(view.gate.code, undefined);
+});
+
+test('gate: wrong code is rejected, correct code records the entry', () => {
+  const bad = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', project: 'The Rich รัชดา', plot: 'A-12', code: 'nope' });
+  assert.equal(bad.error, 'bad_code');
+  assert.equal(hasEntered('game_lucky_draw', 'g1'), false);
+
+  const ok = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', project: 'The Rich รัชดา', plot: 'A-12', code: 'fp2024' });
+  assert.ok(ok.ok);
+  assert.equal(hasEntered('game_lucky_draw', 'g1'), true);
+});
+
+test('gate: name is required even with a valid code', () => {
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'g2', name: '  ', code: 'FP2024' }).error, 'missing_name');
+});
+
+test('gate: draw is blocked until the player passes the gate', () => {
+  assert.equal(draw({ campaign: campaign(), playerId: 'g3', game: 'wheel' }).error, 'gate_required');
+  enterGate({ campaign: campaign(), playerId: 'g3', name: 'ทดสอบ', project: 'Neo Home บางนา', plot: 'B-3', code: 'FP2024' });
+  assert.ok(!draw({ campaign: campaign(), playerId: 'g3', game: 'wheel' }).error);
+});
+
+test('gate: sanitizeCampaign keeps projects list and trims the code', () => {
+  const saved = sanitizeCampaign({ name: 'g', gate: { enabled: true, code: '  ABC1 ', projects: ['P1', ' P2 ', ''] } }, 'org_company_a');
+  assert.equal(saved.gate.enabled, true);
+  assert.equal(saved.gate.code, 'ABC1');
+  assert.deepEqual(saved.gate.projects, ['P1', 'P2']);
 });
 
 test('campaign stats aggregate draws', () => {

@@ -78,6 +78,44 @@ body[data-pattern="dots"] {
 .game { text-align: center; }
 .hint { color: var(--muted); font-size: 13px; margin: 0 auto 16px; line-height: 1.8; max-width: 320px; }
 
+/* ── หน้าแรก: ฟอร์มลงทะเบียน ─────────────────────────────────────────────── */
+.entry { display: flex; justify-content: center; margin-top: 6px; }
+.entry-card {
+  width: 100%; max-width: 400px; background: var(--surface);
+  border: var(--bd); border-radius: calc(var(--radius) * 1.4);
+  box-shadow: var(--pop-lg); padding: 24px 22px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.entry-title { font-size: 19px; font-weight: 700; text-align: center; }
+.entry-sub { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: -8px; line-height: 1.7; }
+.field { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.field > span { font-size: 12.5px; font-weight: 600; }
+.field input {
+  font-family: inherit; font-size: 16px; padding: 11px 13px; width: 100%;
+  border: var(--bd); border-radius: var(--radius); background: var(--bg); color: var(--ink);
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.combo { position: relative; }
+.combo-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin-top: 5px;
+  max-height: 220px; overflow-y: auto; background: var(--surface);
+  border: var(--bd); border-radius: var(--radius); box-shadow: var(--pop);
+}
+.combo-opt {
+  display: block; width: 100%; text-align: left; padding: 11px 13px;
+  font-family: inherit; font-size: 14.5px; color: var(--ink);
+  background: none; border: none; cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.combo-opt:last-child { border-bottom: none; }
+.combo-opt:hover, .combo-opt:focus { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.entry-err {
+  font-size: 13px; color: var(--on-accent); background: var(--accent);
+  padding: 10px 12px; border-radius: var(--radius); text-align: center;
+}
+.cta.block { width: 100%; margin-top: 6px; }
+
 /* ── Buttons ── */
 .cta {
   margin-top: 24px; padding: 13px 40px; cursor: pointer;
@@ -299,3 +337,54 @@ body[data-pattern="dots"] {
 /* confetti */
 .confetti { position: fixed; top: -30px; z-index: 55; pointer-events: none; animation: fall linear forwards; }
 @keyframes fall { to { transform: translateY(112vh) rotate(620deg); opacity: .3; } }
+
+/* ── iPad / tablet: scale up the whole experience for a larger touch screen ── */
+@media (min-width: 768px) {
+  #app { max-width: 640px; padding: 48px 28px 60px; }
+  .overline { font-size: 13px; padding: 7px 22px; }
+  .hero h1 { font-size: 33px; }
+  .plays { font-size: 16px; margin-top: 16px; padding: 8px 20px; }
+  .plays b { font-size: 19px; }
+
+  .tabs { gap: 12px; margin: 28px 0 26px; }
+  .tabs button { max-width: 160px; padding: 14px 6px; border-radius: calc(var(--radius) + 4px); }
+  .tabs button svg { width: 27px; height: 27px; }
+  .tabs button span { font-size: 15px; }
+
+  .hint { font-size: 16px; max-width: 440px; margin-bottom: 22px; line-height: 2; }
+  .cta { font-size: 17px; padding: 16px 52px; margin-top: 30px; }
+
+  /* Bigger wheel + hub for the larger canvas */
+  .wheel-wrap { width: min(72vw, 470px); }
+  .hub { width: 94px; height: 94px; }
+  .hub span { font-size: 20px; }
+
+  /* Roomier เซียมซี + ไพ่ */
+  .shrine { padding: 120px 0 0; }
+  .cylinder { width: 176px; }
+  .card-row { gap: 14px; }
+  .tcard { width: 78px; height: 128px; }
+  .tface.front .art { font-size: 38px; }
+  .tface.front .nm { font-size: 11px; }
+
+  /* Registration form */
+  .entry-card { max-width: 520px; padding: 36px 40px 32px; gap: 20px; border-radius: calc(var(--radius) * 1.6); }
+  .entry-title { font-size: 26px; }
+  .entry-sub { font-size: 15px; margin-top: -10px; }
+  .field { gap: 8px; }
+  .field > span { font-size: 15px; }
+  .field input { font-size: 17px; padding: 15px 17px; }
+  .combo-opt { font-size: 16px; padding: 14px 16px; }
+  .entry-err { font-size: 15px; padding: 12px 14px; }
+
+  .sheet { max-width: 460px; padding: 38px 32px 30px; }
+  .prize-name { font-size: 26px; }
+  .fortune-slip .f-text { font-size: 14px; }
+  .coupon .c-code { font-size: 23px; }
+}
+
+/* Landscape iPad: keep the wheel from overflowing the shorter height */
+@media (min-width: 768px) and (orientation: landscape) and (max-height: 840px) {
+  #app { padding-top: 28px; }
+  .wheel-wrap { width: min(52vh, 400px); }
+}
