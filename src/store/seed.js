@@ -159,22 +159,22 @@ export function seedIfEmpty() {
   db.gameCampaigns.insert({
     id: 'game_lucky_draw',
     organizationId: O,
-    name: 'ลุ้นโชคกับ Company A',
+    name: 'ลุ้นโชคกับ Frasers Property',
     active: true,
     games: ['wheel', 'sticks', 'cards'],
     limitPerDay: 3,
     theme: {
-      preset: 'studio',
-      colors: { bg: '#f4f2ec', surface: '#ffffff', ink: '#23212b', muted: '#7a7581', accent: '#4f46e5', accent2: '#23212b', highlight: '#f2b634' },
-      style: { radius: 14, borderWidth: 1.5, shadow: 'soft', pattern: 'none' },
+      preset: 'frasers',
+      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
+      style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
     },
     prizes: [
-      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#f2b634', couponPrefix: 'LUCKY500' },
-      { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#4f46e5', couponPrefix: 'LUCKY100' },
-      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#2f9e8f', couponPrefix: 'LUCKY50' },
-      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#7fa653', couponPrefix: 'FREESHIP' },
-      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#d95d77', couponPrefix: 'GIFT' },
-      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#2c2a35' },
+      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#c9a557', couponPrefix: 'LUCKY500' },
+      { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#da291c', couponPrefix: 'LUCKY100' },
+      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#333f48', couponPrefix: 'LUCKY50' },
+      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#5c6670', couponPrefix: 'FREESHIP' },
+      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#97231c', couponPrefix: 'GIFT' },
+      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#22282e' },
     ],
   });
 

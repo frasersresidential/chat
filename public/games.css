@@ -4,19 +4,19 @@
    theme (editable in the admin Games tab). */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
-  --bg: #f4f2ec;
+  --bg: #f7f5f2;
   --surface: #ffffff;
-  --ink: #23212b;
-  --muted: #7a7581;
-  --accent: #4f46e5;
-  --accent2: #23212b;
-  --highlight: #f2b634;
+  --ink: #333f48;
+  --muted: #828a92;
+  --accent: #da291c;
+  --accent2: #333f48;
+  --highlight: #c9a557;
   --on-accent: #ffffff;
   --on-accent2: #ffffff;
-  --on-highlight: #23212b;
+  --on-highlight: #ffffff;
   --on-ink: #ffffff;
-  --radius: 14px;
-  --bw: 1.5px;
+  --radius: 8px;
+  --bw: 1px;
   --bd: var(--bw) solid var(--ink);
 }
 /* shadow style is a theme knob: hard = sticker offset, soft = modern blur */

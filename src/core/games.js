@@ -29,6 +29,11 @@ export const GAME_TYPES = ['wheel', 'sticks', 'cards'];
 // color/style overrides) and the client maps it onto CSS variables. Admins
 // pick a preset in the Games tab, then fine-tune any color with a picker.
 export const THEME_PRESETS = {
+  frasers: {
+    label: 'Frasers Property',
+    colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
+    style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
+  },
   studio: {
     label: 'Studio',
     colors: { bg: '#f4f2ec', surface: '#ffffff', ink: '#23212b', muted: '#7a7581', accent: '#4f46e5', accent2: '#23212b', highlight: '#f2b634' },

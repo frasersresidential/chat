@@ -224,15 +224,19 @@ async function pickCard(el) {
 }
 
 /* ── ผลรางวัล ─────────────────────────────────────────────────────────────── */
+// Sparkle rain tinted with the campaign's own prize colors so it matches any theme.
 function confetti() {
-  const glyphs = ['🎉', '✨', '💖', '⚡', '🌟', '💜'];
-  for (let i = 0; i < 26; i++) {
+  const glyphs = ['✦', '●', '✧', '▪'];
+  const colors = (state.campaign?.prizes || []).map((p) => p.color).filter(Boolean);
+  if (!colors.length) colors.push('#c9a557');
+  for (let i = 0; i < 24; i++) {
     const s = document.createElement('span');
     s.className = 'confetti';
-    s.textContent = glyphs[i % glyphs.length];
+    s.textContent = i % 6 === 0 ? '🎉' : glyphs[i % glyphs.length];
     s.style.left = Math.random() * 100 + 'vw';
-    s.style.fontSize = 14 + Math.random() * 12 + 'px';
-    s.style.animationDuration = 2.2 + Math.random() * 2.2 + 's';
+    s.style.color = colors[i % colors.length];
+    s.style.fontSize = 11 + Math.random() * 10 + 'px';
+    s.style.animationDuration = 2.4 + Math.random() * 2.2 + 's';
     s.style.animationDelay = Math.random() * 0.6 + 's';
     document.body.appendChild(s);
     setTimeout(() => s.remove(), 5500);
