@@ -161,7 +161,7 @@ export function seedIfEmpty() {
     organizationId: O,
     name: 'ลุ้นโชคกับ Frasers Property',
     active: true,
-    games: ['wheel', 'sticks', 'cards'],
+    game: 'wheel',
     limitPerDay: 3,
     theme: {
       preset: 'frasers',

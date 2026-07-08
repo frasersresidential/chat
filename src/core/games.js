@@ -24,6 +24,14 @@ const log = logger('games');
 
 export const GAME_TYPES = ['wheel', 'sticks', 'cards'];
 
+/** Each campaign (= one shareable link) runs exactly one game. Legacy campaigns
+ *  stored a `games` array — fall back to its first entry. */
+export function campaignGame(campaign) {
+  if (campaign?.game && GAME_TYPES.includes(campaign.game)) return campaign.game;
+  if (Array.isArray(campaign?.games) && GAME_TYPES.includes(campaign.games[0])) return campaign.games[0];
+  return 'wheel';
+}
+
 // ── Theming ────────────────────────────────────────────────────────────────
 // The game page is fully token-driven: a campaign carries a theme (preset +
 // color/style overrides) and the client maps it onto CSS variables. Admins
@@ -129,7 +137,7 @@ export function publicCampaign(campaign) {
     id: campaign.id,
     name: campaign.name,
     active: campaign.active !== false,
-    games: campaign.games || GAME_TYPES,
+    game: campaignGame(campaign),
     limitPerDay: campaign.limitPerDay ?? 3,
     theme: sanitizeTheme(campaign.theme || {}, campaign.theme || {}),
     // gate.code is deliberately omitted — the entry form validates it server-side.
@@ -150,12 +158,14 @@ export function hasEntered(campaignId, playerId) {
  * Validate the entry form and, if the access code matches, record the player's
  * details. Returns { error } on a bad code / missing field, else { ok }.
  */
-export function enterGate({ campaign, playerId, name, project, plot, code }) {
+export function enterGate({ campaign, playerId, name, phone, project, plot, code }) {
   if (!campaign || campaign.active === false) return { error: 'campaign_inactive' };
   if (!playerId || typeof playerId !== 'string' || playerId.length > 80) return { error: 'bad_player' };
   const gate = campaign.gate || {};
   const nm = String(name || '').trim();
   if (!nm) return { error: 'missing_name' };
+  const tel = String(phone || '').trim();
+  if (!tel) return { error: 'missing_phone' };
   if (gate.enabled) {
     const want = String(gate.code || '').trim().toLowerCase();
     const got = String(code || '').trim().toLowerCase();
@@ -166,6 +176,7 @@ export function enterGate({ campaign, playerId, name, project, plot, code }) {
   const data = {
     campaignId: campaign.id, playerId,
     name: nm.slice(0, 120),
+    phone: tel.slice(0, 40),
     project: String(project || '').trim().slice(0, 120),
     plot: String(plot || '').trim().slice(0, 60),
   };
@@ -203,8 +214,7 @@ function weightedPick(prizes) {
  */
 export function draw({ campaign, playerId, game }) {
   if (!campaign || campaign.active === false) return { error: 'campaign_inactive' };
-  const games = campaign.games || GAME_TYPES;
-  if (!games.includes(game)) return { error: 'unknown_game' };
+  if (game !== campaignGame(campaign)) return { error: 'unknown_game' };
   if (!playerId || typeof playerId !== 'string' || playerId.length > 80) return { error: 'bad_player' };
 
   // Enforce the entry gate server-side so the form can't be skipped.
@@ -268,12 +278,15 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     color: typeof p.color === 'string' ? p.color.slice(0, 20) : null,
     couponPrefix: typeof p.couponPrefix === 'string' ? p.couponPrefix.slice(0, 20) : null,
   })) : existing.prizes || [];
-  const games = Array.isArray(body.games) ? body.games.filter((g) => GAME_TYPES.includes(g)) : existing.games || GAME_TYPES;
+  // One game per campaign/link. Accept `game`, else legacy `games[0]`, else keep existing.
+  const game = GAME_TYPES.includes(body.game) ? body.game
+    : (Array.isArray(body.games) && GAME_TYPES.includes(body.games[0]) ? body.games[0]
+      : campaignGame(existing));
   return {
     organizationId,
     name: String(body.name || existing.name || 'Lucky Draw').slice(0, 120),
     active: body.active === undefined ? existing.active !== false : !!body.active,
-    games: games.length ? games : GAME_TYPES,
+    game,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
     theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
     gate: sanitizeGate(body.gate, existing.gate),

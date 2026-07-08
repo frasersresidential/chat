@@ -1452,24 +1452,29 @@ async function renderGames(main) {
     accent: 'สีหลัก (ปุ่ม / เข็ม / ป้าย)', accent2: 'สีรอง (แท็บ / กระบอกเซียมซี / หลังไพ่)', highlight: 'สีไฮไลต์ (ปุ่ม GO / ใบเซียมซี)',
   };
   const playUrl = `/games.html?c=${encodeURIComponent(c.id)}`;
+  const fullUrl = location.origin + playUrl;
+  const cGame = c.game || (Array.isArray(c.games) && c.games[0]) || 'wheel';
+  const GAME_OPTS = [['wheel', 'วงล้อ (Spin Wheel)'], ['sticks', 'เซียมซี'], ['cards', 'เปิดไพ่ (Tarot)']];
 
   main.innerHTML = `<div class="admin">
     <h2>Games — Lucky Draw</h2>
-    <p class="muted">เกมสุ่มรางวัลสำหรับลูกค้า (วงล้อ / เซียมซี / เปิดไพ่) — ส่งลิงก์ให้ลูกค้าผ่าน Broadcast แล้วแนบ <code>?u=&lt;รหัสลูกค้า&gt;</code> เพื่อผูกสิทธิ์รายวัน</p>
+    <p class="muted">1 แคมเปญ = 1 ลิงก์ = 1 เกม — เลือกเกม, ตั้งรางวัล/ธีม/โค้ดของแต่ละลิงก์แยกกัน แล้วส่งลิงก์ให้ลูกค้าผ่าน Broadcast (แนบ <code>?u=&lt;รหัสลูกค้า&gt;</code> เพื่อผูกสิทธิ์รายวัน)</p>
 
     <div class="card"><div class="form-grid">
-      <div><label>แคมเปญ</label><select id="gSel">${campaigns.map((x) => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div><label>แคมเปญ (ลิงก์)</label><select id="gSel">${campaigns.map((x) => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
       <div style="display:flex;align-items:flex-end;gap:8px">
-        ${manage ? '<button class="btn ghost" id="gNew">+ สร้างใหม่</button>' : ''}
+        ${manage ? '<button class="btn ghost" id="gNew">+ สร้างลิงก์ใหม่</button>' : ''}
         <a class="btn" href="${playUrl}" target="_blank">เปิดหน้าเกม ↗</a>
       </div>
+      <div style="grid-column:1/-1"><label>ลิงก์สำหรับลูกค้า</label>
+        <div style="display:flex;gap:8px"><input id="gLink" value="${esc(fullUrl)}" readonly style="flex:1" /><button class="btn ghost" id="gCopyLink" type="button">คัดลอก</button></div>
+      </div>
       <div><label>ชื่อแคมเปญ</label><input id="gName" value="${esc(c.name)}" ${dis} /></div>
+      <div><label>เกมของลิงก์นี้</label><select id="gGame" ${dis}>
+        ${GAME_OPTS.map(([k, l]) => `<option value="${k}" ${k === cGame ? 'selected' : ''}>${l}</option>`).join('')}
+      </select></div>
       <div><label>สถานะ</label><select id="gActive" ${dis}><option value="1" ${c.active !== false ? 'selected' : ''}>เปิดใช้งาน</option><option value="" ${c.active === false ? 'selected' : ''}>ปิด</option></select></div>
       <div><label>สิทธิ์ต่อคนต่อวัน</label><input id="gLimit" type="number" min="1" value="${c.limitPerDay ?? 3}" ${dis} /></div>
-      <div><label>เกมที่เปิด</label><div style="display:flex;gap:12px;padding-top:8px">
-        ${[['wheel', 'วงล้อ'], ['sticks', 'เซียมซี'], ['cards', 'เปิดไพ่']].map(([k, l]) =>
-          `<label style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" class="gGame" value="${k}" ${(c.games || []).includes(k) ? 'checked' : ''} ${dis}/>${l}</label>`).join('')}
-      </div></div>
     </div></div>
 
     <div class="card">
@@ -1534,6 +1539,10 @@ async function renderGames(main) {
   </div>`;
 
   $('#gSel').onchange = () => { gamesSelectedId = $('#gSel').value; renderGames(main); };
+  $('#gCopyLink').onclick = async () => {
+    try { await navigator.clipboard.writeText($('#gLink').value); $('#gCopyLink').textContent = '✓ คัดลอกแล้ว'; }
+    catch { $('#gLink').select(); }
+  };
 
   $('#gViewEntries').onclick = async () => {
     const box = $('#gEntriesBox');
@@ -1541,13 +1550,13 @@ async function renderGames(main) {
     try {
       const { draws } = await api('/games/campaigns/' + c.id + '/draws');
       if (!draws.length) { box.innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; return; }
-      box.innerHTML = `<table><thead><tr><th>เวลา</th><th>ชื่อ-นามสกุล</th><th>โครงการ</th><th>แปลง</th><th>เกม</th><th>ผล</th><th>โค้ด</th></tr></thead>
+      box.innerHTML = `<table><thead><tr><th>เวลา</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>โครงการ</th><th>แปลง</th><th>ผล</th><th>โค้ด</th></tr></thead>
         <tbody>${draws.map((d) => `<tr>
           <td>${new Date(d.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
           <td>${esc(d.player?.name || '—')}</td>
+          <td>${esc(d.player?.phone || '—')}</td>
           <td>${esc(d.player?.project || '—')}</td>
           <td>${esc(d.player?.plot || '—')}</td>
-          <td>${esc({ wheel: 'วงล้อ', sticks: 'เซียมซี', cards: 'เปิดไพ่' }[d.game] || d.game)}</td>
           <td>${d.win ? '<span class="pill">ได้รางวัล</span>' : '—'}</td>
           <td>${d.couponCode ? `<code>${esc(d.couponCode)}</code>` : '—'}</td>
         </tr>`).join('')}</tbody></table>`;
@@ -1599,7 +1608,7 @@ async function renderGames(main) {
         name: $('#gName').value,
         active: !!$('#gActive').value,
         limitPerDay: Number($('#gLimit').value) || 3,
-        games: [...main.querySelectorAll('.gGame:checked')].map((x) => x.value),
+        game: $('#gGame').value,
         theme: {
           preset: $('#gPresetVal').value,
           colors,

@@ -29,6 +29,7 @@ const ERRORS = {
   gate_required: 'กรุณาลงทะเบียนก่อนเริ่มเล่น',
   bad_code: 'รหัสไม่ถูกต้อง กรุณาตรวจสอบกับเจ้าหน้าที่',
   missing_name: 'กรุณากรอกชื่อ - นามสกุล',
+  missing_phone: 'กรุณากรอกเบอร์โทรศัพท์',
   no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
 
@@ -355,16 +356,6 @@ function showResult(result) {
   $('modal').classList.remove('hidden');
 }
 
-/* ── เริ่มต้น ─────────────────────────────────────────────────────────────── */
-function switchGame(game) {
-  for (const b of document.querySelectorAll('#tabs button')) {
-    b.classList.toggle('active', b.dataset.game === game);
-  }
-  for (const g of ['wheel', 'sticks', 'cards']) {
-    $(`game-${g}`).classList.toggle('hidden', g !== game);
-  }
-}
-
 /* ── หน้าแรก: ฟอร์มลงทะเบียน + ค้นหาโครงการ ────────────────────────────────── */
 function setupProjectCombo(projects) {
   const input = $('fProject');
@@ -414,6 +405,7 @@ function setupEntryForm() {
     const payload = {
       playerId,
       name: $('fName').value.trim(),
+      phone: $('fPhone').value.trim(),
       project: $('fProject').value.trim(),
       plot: $('fPlot').value.trim(),
       code: $('fCode').value.trim(),
@@ -448,18 +440,13 @@ async function init() {
   $('campaignName').textContent = state.campaign.name;
   applyTheme(state.campaign.theme);
 
-  // Show only the game skins this campaign enables.
-  let first = null;
-  for (const b of document.querySelectorAll('#tabs button')) {
-    const enabled = state.campaign.games.includes(b.dataset.game);
-    b.classList.toggle('hidden', !enabled);
-    if (enabled && !first) first = b.dataset.game;
-    b.addEventListener('click', () => switchGame(b.dataset.game));
+  // One game per link — the admin picks it; the customer just plays it.
+  const game = state.campaign.game || 'wheel';
+  for (const g of ['wheel', 'sticks', 'cards']) {
+    $(`game-${g}`).classList.toggle('hidden', g !== game);
   }
-  if (first) switchGame(first);
-
-  buildWheel();
-  dealCards();
+  if (game === 'wheel') buildWheel();
+  if (game === 'cards') dealCards();
   $('spinBtn').addEventListener('click', spinWheel);
   $('shakeBtn').addEventListener('click', shakeSticks);
   $('redealBtn').addEventListener('click', dealCards);

@@ -9,10 +9,11 @@ seedIfEmpty();
 
 const campaign = () => db.gameCampaigns.get('game_lucky_draw');
 
-test('seed creates the demo lucky-draw campaign with all three games', () => {
+test('seed creates the demo lucky-draw campaign as a single-game wheel', () => {
   const c = campaign();
   assert.ok(c);
-  assert.deepEqual(c.games, ['wheel', 'sticks', 'cards']);
+  assert.equal(c.game, 'wheel');
+  assert.equal(publicCampaign(c).game, 'wheel');
   assert.ok(c.prizes.length >= 3);
 });
 
@@ -25,36 +26,48 @@ test('public view never leaks weights or stock counts', () => {
 });
 
 // The seeded campaign gates on a code, so register these players first.
-const enter = (id) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
+const enter = (id) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', phone: '0812345678', project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
 
 test('a draw returns a prize from the pool and flavour matches the game', () => {
-  ['p1', 'p2', 'p3'].forEach(enter);
+  enter('p1');
   const wheel = draw({ campaign: campaign(), playerId: 'p1', game: 'wheel' });
   assert.ok(!wheel.error);
   assert.ok(campaign().prizes.some((p) => p.id === wheel.prize.id));
   assert.equal(wheel.fortune, null);
   assert.ok(wheel.prizeIndex >= 0);
 
-  const sticks = draw({ campaign: campaign(), playerId: 'p2', game: 'sticks' });
+  // Each game lives on its own single-game campaign/link.
+  const sticksC = db.gameCampaigns.insert({
+    organizationId: 'org_company_a', name: 'ส', active: true, game: 'sticks', limitPerDay: 9,
+    prizes: [{ id: 'a', label: 'x', win: true, weight: 1, stock: null }],
+  });
+  const sticks = draw({ campaign: sticksC, playerId: 'p2', game: 'sticks' });
   assert.equal(sticks.fortune.type, 'siamsi');
   assert.ok(sticks.fortune.number >= 1);
 
-  const cards = draw({ campaign: campaign(), playerId: 'p3', game: 'cards' });
+  const cardsC = db.gameCampaigns.insert({
+    organizationId: 'org_company_a', name: 'ค', active: true, game: 'cards', limitPerDay: 9,
+    prizes: [{ id: 'a', label: 'x', win: true, weight: 1, stock: null }],
+  });
+  const cards = draw({ campaign: cardsC, playerId: 'p3', game: 'cards' });
   assert.equal(cards.fortune.type, 'tarot');
   assert.ok(cards.fortune.name);
+
+  // A single-game campaign rejects a different game type.
+  assert.equal(draw({ campaign: cardsC, playerId: 'p3', game: 'wheel' }).error, 'unknown_game');
 });
 
 test('winning draws get a coupon code, losing draws do not', () => {
   // Force a guaranteed win, then a guaranteed loss, via single-prize campaigns.
   const winC = db.gameCampaigns.insert({
-    organizationId: 'org_company_a', name: 'w', active: true, games: ['wheel'], limitPerDay: 99,
+    organizationId: 'org_company_a', name: 'w', active: true, game: 'wheel', limitPerDay: 99,
     prizes: [{ id: 'a', label: 'ส่วนลด', win: true, weight: 1, stock: null, couponPrefix: 'TEST' }],
   });
   const r1 = draw({ campaign: winC, playerId: 'p4', game: 'wheel' });
   assert.match(r1.couponCode, /^TEST-[A-Z2-9]{6}$/);
 
   const loseC = db.gameCampaigns.insert({
-    organizationId: 'org_company_a', name: 'l', active: true, games: ['wheel'], limitPerDay: 99,
+    organizationId: 'org_company_a', name: 'l', active: true, game: 'wheel', limitPerDay: 99,
     prizes: [{ id: 'b', label: 'เสียใจด้วย', win: false, weight: 1, stock: null }],
   });
   const r2 = draw({ campaign: loseC, playerId: 'p4', game: 'wheel' });
@@ -77,7 +90,7 @@ test('daily play limit is enforced per player', () => {
 
 test('finite stock decrements and empty pools stop paying out', () => {
   const c = db.gameCampaigns.insert({
-    organizationId: 'org_company_a', name: 's', active: true, games: ['cards'], limitPerDay: 99,
+    organizationId: 'org_company_a', name: 's', active: true, game: 'cards', limitPerDay: 99,
     prizes: [{ id: 'rare', label: 'รางวัลใหญ่', win: true, weight: 1, stock: 2 }],
   });
   assert.ok(!draw({ campaign: db.gameCampaigns.get(c.id), playerId: 'p5', game: 'cards' }).error);
@@ -119,22 +132,23 @@ test('gate: public view exposes projects but never the access code', () => {
 });
 
 test('gate: wrong code is rejected, correct code records the entry', () => {
-  const bad = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', project: 'The Rich รัชดา', plot: 'A-12', code: 'nope' });
+  const bad = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', phone: '0800000000', project: 'The Rich รัชดา', plot: 'A-12', code: 'nope' });
   assert.equal(bad.error, 'bad_code');
   assert.equal(hasEntered('game_lucky_draw', 'g1'), false);
 
-  const ok = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', project: 'The Rich รัชดา', plot: 'A-12', code: 'fp2024' });
+  const ok = enterGate({ campaign: campaign(), playerId: 'g1', name: 'สมชาย ใจดี', phone: '0800000000', project: 'The Rich รัชดา', plot: 'A-12', code: 'fp2024' });
   assert.ok(ok.ok);
   assert.equal(hasEntered('game_lucky_draw', 'g1'), true);
 });
 
-test('gate: name is required even with a valid code', () => {
-  assert.equal(enterGate({ campaign: campaign(), playerId: 'g2', name: '  ', code: 'FP2024' }).error, 'missing_name');
+test('gate: name and phone are required', () => {
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'g2', name: '  ', phone: '0812345678', code: 'FP2024' }).error, 'missing_name');
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'g2', name: 'สมหญิง', phone: '', code: 'FP2024' }).error, 'missing_phone');
 });
 
 test('gate: draw is blocked until the player passes the gate', () => {
   assert.equal(draw({ campaign: campaign(), playerId: 'g3', game: 'wheel' }).error, 'gate_required');
-  enterGate({ campaign: campaign(), playerId: 'g3', name: 'ทดสอบ', project: 'Neo Home บางนา', plot: 'B-3', code: 'FP2024' });
+  enterGate({ campaign: campaign(), playerId: 'g3', name: 'ทดสอบ', phone: '0898887777', project: 'Neo Home บางนา', plot: 'B-3', code: 'FP2024' });
   assert.ok(!draw({ campaign: campaign(), playerId: 'g3', game: 'wheel' }).error);
 });
 

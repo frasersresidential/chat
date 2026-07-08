@@ -104,7 +104,7 @@ export function createApp() {
     if (!campaign) return res.status(404).json({ error: 'not found' });
     const result = gameEnter({
       campaign, playerId: String(req.body.playerId || ''),
-      name: req.body.name, project: req.body.project, plot: req.body.plot, code: req.body.code,
+      name: req.body.name, phone: req.body.phone, project: req.body.project, plot: req.body.plot, code: req.body.code,
     });
     if (result.error) return res.status(400).json(result);
     res.json(result);

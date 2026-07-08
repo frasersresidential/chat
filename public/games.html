@@ -32,6 +32,11 @@
           <input id="fName" type="text" placeholder="เช่น สมชาย ใจดี" required />
         </label>
 
+        <label class="field wide">
+          <span>เบอร์โทรศัพท์</span>
+          <input id="fPhone" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678" required />
+        </label>
+
         <label class="field combo" id="projField">
           <span>โครงการ</span>
           <input id="fProject" type="text" placeholder="พิมพ์เพื่อค้นหา แล้วเลือกโครงการ" autocomplete="off" required />
@@ -55,21 +60,6 @@
 
     <!-- ── หน้าเกม (แสดงหลังผ่านฟอร์ม) ─────────────────────────────── -->
     <div id="playArea" class="hidden">
-    <nav class="tabs" id="tabs">
-      <button data-game="wheel" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3v6.6M12 14.4V21M3 12h6.6M14.4 12H21M5.6 5.6l4.7 4.7M13.7 13.7l4.7 4.7M18.4 5.6l-4.7 4.7M10.3 13.7l-4.7 4.7"/></svg>
-        <span>วงล้อ</span>
-      </button>
-      <button data-game="sticks">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3.5V10M12 2v8M15 4v6"/><path d="M6.2 10h11.6l-1.3 10.5a1.5 1.5 0 0 1-1.5 1.3H9a1.5 1.5 0 0 1-1.5-1.3Z"/></svg>
-        <span>เซียมซี</span>
-      </button>
-      <button data-game="cards">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4" y="4.5" width="10" height="15" rx="1.4" transform="rotate(-8 9 12)"/><rect x="10.5" y="4.5" width="10" height="15" rx="1.4" transform="rotate(8 15.5 12)"/></svg>
-        <span>เปิดไพ่</span>
-      </button>
-    </nav>
-
     <main id="stage">
       <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
       <section id="game-wheel" class="game">
