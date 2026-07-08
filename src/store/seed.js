@@ -159,17 +159,17 @@ export function seedIfEmpty() {
   db.gameCampaigns.insert({
     id: 'game_lucky_draw',
     organizationId: O,
-    name: 'ลุ้นโชคกับ Company A 🎉',
+    name: 'ลุ้นโชคกับ Company A',
     active: true,
     games: ['wheel', 'sticks', 'cards'],
     limitPerDay: 3,
     prizes: [
-      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#f59e0b', couponPrefix: 'LUCKY500' },
-      { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#8b5cf6', couponPrefix: 'LUCKY100' },
-      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#3b82f6', couponPrefix: 'LUCKY50' },
-      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#10b981', couponPrefix: 'FREESHIP' },
-      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#ec4899', couponPrefix: 'GIFT' },
-      { id: 'pz_none', label: 'เสียใจด้วยนะ 😅', win: false, weight: 40, stock: null, color: '#64748b' },
+      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#b2882e', couponPrefix: 'LUCKY500' },
+      { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#22222c', couponPrefix: 'LUCKY100' },
+      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#1d2733', couponPrefix: 'LUCKY50' },
+      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#20291f', couponPrefix: 'FREESHIP' },
+      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#2c2029', couponPrefix: 'GIFT' },
+      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#191920' },
     ],
   });
 

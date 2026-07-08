@@ -3,39 +3,53 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-  <title>ลุ้นโชค 🎉</title>
-  <meta name="theme-color" content="#160b33" />
+  <title>Lucky Draw</title>
+  <meta name="theme-color" content="#0c0c11" />
   <link rel="icon" type="image/png" href="/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/games.css" />
 </head>
 <body>
   <div id="app">
     <header class="hero">
+      <div class="overline">✦ &nbsp;Lucky Draw&nbsp; ✦</div>
       <h1 id="campaignName">กำลังโหลด…</h1>
-      <p class="plays">วันนี้เหลือสิทธิ์ลุ้น <b id="playsLeft">–</b> ครั้ง</p>
+      <div class="hairline"></div>
+      <p class="plays">สิทธิ์ลุ้นรางวัลวันนี้ <b id="playsLeft">–</b> ครั้ง</p>
     </header>
 
     <nav class="tabs" id="tabs">
-      <button data-game="wheel" class="active">🎡<span>วงล้อนำโชค</span></button>
-      <button data-game="sticks">🎋<span>เซียมซี</span></button>
-      <button data-game="cards">🔮<span>เปิดไพ่</span></button>
+      <button data-game="wheel" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3v6.6M12 14.4V21M3 12h6.6M14.4 12H21M5.6 5.6l4.7 4.7M13.7 13.7l4.7 4.7M18.4 5.6l-4.7 4.7M10.3 13.7l-4.7 4.7"/></svg>
+        <span>วงล้อ</span>
+      </button>
+      <button data-game="sticks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3.5V10M12 2v8M15 4v6"/><path d="M6.2 10h11.6l-1.3 10.5a1.5 1.5 0 0 1-1.5 1.3H9a1.5 1.5 0 0 1-1.5-1.3Z"/></svg>
+        <span>เซียมซี</span>
+      </button>
+      <button data-game="cards">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4" y="4.5" width="10" height="15" rx="1.4" transform="rotate(-8 9 12)"/><rect x="10.5" y="4.5" width="10" height="15" rx="1.4" transform="rotate(8 15.5 12)"/></svg>
+        <span>เปิดไพ่</span>
+      </button>
     </nav>
 
     <main id="stage">
       <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
       <section id="game-wheel" class="game">
-        <p class="hint">กดปุ่มตรงกลางเพื่อหมุนวงล้อ แล้วลุ้นว่าเข็มจะชี้ที่รางวัลไหน!</p>
+        <p class="hint">แตะปุ่มกลางวงล้อ แล้วรอเข็มทองหยุดที่รางวัลของคุณ</p>
         <div class="wheel-wrap">
           <div class="pointer"></div>
           <svg id="wheelSvg" viewBox="0 0 300 300" aria-label="วงล้อรางวัล"></svg>
-          <button id="spinBtn" class="hub">หมุน<br>เลย!</button>
+          <button id="spinBtn" class="hub"><span>หมุน</span></button>
         </div>
       </section>
 
       <!-- ── เกม 2: เซียมซี ───────────────────────────────────────────── -->
       <section id="game-sticks" class="game hidden">
-        <p class="hint">ตั้งจิตอธิษฐาน แล้วกดเขย่ากระบอกเซียมซีเพื่อรับคำทำนายพร้อมลุ้นรางวัล</p>
+        <p class="hint">ตั้งจิตอธิษฐานถึงสิ่งที่ปรารถนา แล้วเขย่ากระบอกเพื่อรับคำทำนายพร้อมลุ้นรางวัล</p>
         <div class="shrine">
           <div id="cylinder" class="cylinder">
             <div class="sticks">
@@ -43,17 +57,17 @@
               <i id="luckyStick" class="lucky"><b id="stickNum"></b></i>
               <i></i><i></i><i></i>
             </div>
-            <div class="cyl-body"><span>เซียมซี<br>เสี่ยงโชค</span></div>
+            <div class="cyl-body"><span class="plaque">เซียมซี<em>เสี่ยงทาย</em></span></div>
           </div>
         </div>
-        <button id="shakeBtn" class="cta">🙏 เขย่าเซียมซี</button>
+        <button id="shakeBtn" class="cta">เขย่าเซียมซี</button>
       </section>
 
       <!-- ── เกม 3: เปิดไพ่ ───────────────────────────────────────────── -->
       <section id="game-cards" class="game hidden">
-        <p class="hint">จิตใจสงบนิ่ง… แล้วเลือกไพ่ที่เรียกคุณ 1 ใบ</p>
+        <p class="hint">จิตใจสงบนิ่ง… แล้วเลือกไพ่ที่เรียกหาคุณเพียงหนึ่งใบ</p>
         <div id="cardRow" class="card-row"></div>
-        <button id="redealBtn" class="cta ghost hidden">🔮 สับไพ่ใหม่</button>
+        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่</button>
       </section>
     </main>
 
@@ -66,7 +80,7 @@
       <div id="fortuneBox"></div>
       <div id="prizeBox"></div>
       <div id="couponBox"></div>
-      <button id="againBtn" class="cta">เล่นอีกครั้ง</button>
+      <button id="againBtn" class="cta primary">เล่นอีกครั้ง</button>
     </div>
   </div>
 
