@@ -164,19 +164,23 @@ export function enterGate({ campaign, playerId, name, phone, project, plot, code
   const gate = campaign.gate || {};
   const nm = String(name || '').trim();
   if (!nm) return { error: 'missing_name' };
-  const tel = String(phone || '').trim();
+  // Digits only — strip any dashes/spaces/symbols the client may have sent.
+  const tel = String(phone || '').replace(/\D/g, '');
   if (!tel) return { error: 'missing_phone' };
+  if (tel.length < 9 || tel.length > 15) return { error: 'bad_phone' };
   if (gate.enabled) {
     const want = String(gate.code || '').trim().toLowerCase();
     const got = String(code || '').trim().toLowerCase();
     if (!want) return { error: 'no_code_configured' };
     if (got !== want) return { error: 'bad_code' };
   }
+  // One play per phone: refuse registration once this number has already played.
+  if (drawsByPhone(campaign.id, tel).length >= 1) return { error: 'phone_used' };
   const existing = db.gameEntries.find((e) => e.campaignId === campaign.id && e.playerId === playerId);
   const data = {
     campaignId: campaign.id, playerId,
     name: nm.slice(0, 120),
-    phone: tel.slice(0, 40),
+    phone: tel,
     project: String(project || '').trim().slice(0, 120),
     plot: String(plot || '').trim().slice(0, 60),
   };
@@ -190,10 +194,30 @@ export function drawsToday(campaignId, playerId) {
   return db.gameDraws.filter((d) => d.campaignId === campaignId && d.playerId === playerId && d.day === day);
 }
 
-export function remainingToday(campaign, playerId) {
+/** The registered phone number for a player (null if the campaign isn't gated). */
+export function phoneOf(campaignId, playerId) {
+  const e = db.gameEntries.find((x) => x.campaignId === campaignId && x.playerId === playerId);
+  return e?.phone || null;
+}
+
+/** Draws already made from a given phone number in a campaign (any device/day). */
+function drawsByPhone(campaignId, phone) {
+  return db.gameDraws.filter((d) => d.campaignId === campaignId && d.phone === phone);
+}
+
+/**
+ * Remaining plays for a player. Gated campaigns are one-time-per-phone (a phone
+ * number can play exactly once, on any device); ungated ones fall back to the
+ * per-day-per-player limit.
+ */
+export function remainingPlays(campaign, playerId) {
+  const phone = phoneOf(campaign.id, playerId);
+  if (phone) return drawsByPhone(campaign.id, phone).length >= 1 ? 0 : 1;
   const limit = campaign.limitPerDay ?? 3;
   return Math.max(0, limit - drawsToday(campaign.id, playerId).length);
 }
+// Back-compat alias (older imports / one-per-day semantics).
+export const remainingToday = remainingPlays;
 
 /** Weighted random over prizes that still have stock. */
 function weightedPick(prizes) {
@@ -220,8 +244,14 @@ export function draw({ campaign, playerId, game }) {
   // Enforce the entry gate server-side so the form can't be skipped.
   if (campaign.gate?.enabled && !hasEntered(campaign.id, playerId)) return { error: 'gate_required' };
 
-  const limit = campaign.limitPerDay ?? 3;
-  if (drawsToday(campaign.id, playerId).length >= limit) return { error: 'daily_limit' };
+  // One play per phone number for gated campaigns; per-day-per-player otherwise.
+  const phone = phoneOf(campaign.id, playerId);
+  if (phone) {
+    if (drawsByPhone(campaign.id, phone).length >= 1) return { error: 'phone_used' };
+  } else {
+    const limit = campaign.limitPerDay ?? 3;
+    if (drawsToday(campaign.id, playerId).length >= limit) return { error: 'daily_limit' };
+  }
 
   const prize = weightedPick(campaign.prizes || []);
   if (!prize) return { error: 'no_prizes' };
@@ -239,7 +269,7 @@ export function draw({ campaign, playerId, game }) {
     game === 'cards' ? { type: 'tarot', ...pick(TAROT_CARDS) } : null;
 
   db.gameDraws.insert({
-    campaignId: campaign.id, playerId, game,
+    campaignId: campaign.id, playerId, phone, game,
     prizeId: prize.id, win, couponCode, fortune, day: todayKey(),
   });
   log.info(`draw: ${playerId} played ${game} on ${campaign.id} → ${prize.label}`);
@@ -249,7 +279,7 @@ export function draw({ campaign, playerId, game }) {
     prizeIndex: (campaign.prizes || []).findIndex((p) => p.id === prize.id),
     couponCode,
     fortune,
-    remainingToday: remainingToday(db.gameCampaigns.get(campaign.id), playerId),
+    remainingToday: remainingPlays(db.gameCampaigns.get(campaign.id), playerId),
   };
 }
 

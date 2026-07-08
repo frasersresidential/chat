@@ -30,6 +30,8 @@ const ERRORS = {
   bad_code: 'รหัสไม่ถูกต้อง กรุณาตรวจสอบกับเจ้าหน้าที่',
   missing_name: 'กรุณากรอกชื่อ - นามสกุล',
   missing_phone: 'กรุณากรอกเบอร์โทรศัพท์',
+  bad_phone: 'กรุณากรอกเบอร์โทรให้ถูกต้อง (เฉพาะตัวเลข)',
+  phone_used: 'เบอร์นี้ใช้สิทธิ์ลุ้นรางวัลไปแล้ว ขอบคุณที่ร่วมสนุก 🙏',
   no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
 
@@ -398,6 +400,12 @@ function showPlay() {
 
 function setupEntryForm() {
   setupProjectCombo(state.campaign.gate?.projects || []);
+  // Phone: digits only — strip anything else as the user types.
+  const phone = $('fPhone');
+  if (phone) phone.addEventListener('input', () => {
+    const digits = phone.value.replace(/\D/g, '').slice(0, 15);
+    if (digits !== phone.value) phone.value = digits;
+  });
   $('entryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('entryErr');

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/store/db.js';
 import { seedIfEmpty } from '../src/store/seed.js';
-import { draw, publicCampaign, remainingToday, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS, enterGate, hasEntered } from '../src/core/games.js';
+import { draw, publicCampaign, remainingPlays, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS, enterGate, hasEntered } from '../src/core/games.js';
 
 db._reset();
 seedIfEmpty();
@@ -26,7 +26,9 @@ test('public view never leaks weights or stock counts', () => {
 });
 
 // The seeded campaign gates on a code, so register these players first.
-const enter = (id) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', phone: '0812345678', project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
+// Each player gets a distinct phone (one play per phone number is enforced).
+let phoneSeq = 700000000;
+const enter = (id, phone) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', phone: phone || String(phoneSeq++), project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
 
 test('a draw returns a prize from the pool and flavour matches the game', () => {
   enter('p1');
@@ -75,17 +77,27 @@ test('winning draws get a coupon code, losing draws do not', () => {
   assert.equal(r2.prize.win, false);
 });
 
-test('daily play limit is enforced per player', () => {
-  enter('limited'); enter('someone_else');
-  const c = campaign();
-  const limit = c.limitPerDay;
-  for (let i = 0; i < limit; i++) {
-    assert.ok(!draw({ campaign: campaign(), playerId: 'limited', game: 'wheel' }).error);
-  }
-  assert.equal(remainingToday(campaign(), 'limited'), 0);
-  assert.equal(draw({ campaign: campaign(), playerId: 'limited', game: 'wheel' }).error, 'daily_limit');
-  // Other players are unaffected.
-  assert.ok(!draw({ campaign: campaign(), playerId: 'someone_else', game: 'wheel' }).error);
+test('one play per phone number (any device)', () => {
+  enter('ph1', '0899990001');
+  assert.ok(!draw({ campaign: campaign(), playerId: 'ph1', game: 'wheel' }).error);
+  assert.equal(remainingPlays(campaign(), 'ph1'), 0);
+  // Same phone drawing again is blocked...
+  assert.equal(draw({ campaign: campaign(), playerId: 'ph1', game: 'wheel' }).error, 'phone_used');
+  // ...even from a different device / playerId (re-registration is refused).
+  assert.equal(
+    enterGate({ campaign: campaign(), playerId: 'ph1b', name: 'x', phone: '0899990001', project: 'p', plot: '1', code: 'FP2024' }).error,
+    'phone_used');
+  // A different phone can still play.
+  enter('ph2', '0899990002');
+  assert.ok(!draw({ campaign: campaign(), playerId: 'ph2', game: 'wheel' }).error);
+});
+
+test('phone is stored as digits only and length-validated', () => {
+  const ok = enterGate({ campaign: campaign(), playerId: 'fmt1', name: 'ก', phone: '081-234-5678', project: 'p', plot: '1', code: 'FP2024' });
+  assert.ok(ok.ok);
+  assert.equal(draw({ campaign: campaign(), playerId: 'fmt1', game: 'wheel' }).error, undefined);
+  // too short after stripping symbols
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt2', name: 'ก', phone: '12-34', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
 });
 
 test('finite stock decrements and empty pools stop paying out', () => {
