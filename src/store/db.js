@@ -32,6 +32,8 @@ const EMPTY = () => ({
   projects: {},
   reminders: {},
   pushSubscriptions: {},
+  gameCampaigns: {},
+  gameDraws: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -113,6 +115,8 @@ export const db = {
   projects: collection('projects'),
   reminders: collection('reminders'),
   pushSubscriptions: collection('pushSubscriptions'),
+  gameCampaigns: collection('gameCampaigns'),
+  gameDraws: collection('gameDraws'),
 
   /**
    * Load persisted data. When DATABASE_URL is set, hydrate from Postgres and

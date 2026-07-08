@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>ลุ้นโชค 🎉</title>
+  <meta name="theme-color" content="#160b33" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/games.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hero">
+      <h1 id="campaignName">กำลังโหลด…</h1>
+      <p class="plays">วันนี้เหลือสิทธิ์ลุ้น <b id="playsLeft">–</b> ครั้ง</p>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button data-game="wheel" class="active">🎡<span>วงล้อนำโชค</span></button>
+      <button data-game="sticks">🎋<span>เซียมซี</span></button>
+      <button data-game="cards">🔮<span>เปิดไพ่</span></button>
+    </nav>
+
+    <main id="stage">
+      <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
+      <section id="game-wheel" class="game">
+        <p class="hint">กดปุ่มตรงกลางเพื่อหมุนวงล้อ แล้วลุ้นว่าเข็มจะชี้ที่รางวัลไหน!</p>
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <svg id="wheelSvg" viewBox="0 0 300 300" aria-label="วงล้อรางวัล"></svg>
+          <button id="spinBtn" class="hub">หมุน<br>เลย!</button>
+        </div>
+      </section>
+
+      <!-- ── เกม 2: เซียมซี ───────────────────────────────────────────── -->
+      <section id="game-sticks" class="game hidden">
+        <p class="hint">ตั้งจิตอธิษฐาน แล้วกดเขย่ากระบอกเซียมซีเพื่อรับคำทำนายพร้อมลุ้นรางวัล</p>
+        <div class="shrine">
+          <div id="cylinder" class="cylinder">
+            <div class="sticks">
+              <i></i><i></i><i></i><i></i><i></i><i></i>
+              <i id="luckyStick" class="lucky"><b id="stickNum"></b></i>
+              <i></i><i></i><i></i>
+            </div>
+            <div class="cyl-body"><span>เซียมซี<br>เสี่ยงโชค</span></div>
+          </div>
+        </div>
+        <button id="shakeBtn" class="cta">🙏 เขย่าเซียมซี</button>
+      </section>
+
+      <!-- ── เกม 3: เปิดไพ่ ───────────────────────────────────────────── -->
+      <section id="game-cards" class="game hidden">
+        <p class="hint">จิตใจสงบนิ่ง… แล้วเลือกไพ่ที่เรียกคุณ 1 ใบ</p>
+        <div id="cardRow" class="card-row"></div>
+        <button id="redealBtn" class="cta ghost hidden">🔮 สับไพ่ใหม่</button>
+      </section>
+    </main>
+
+    <footer class="foot">Powered by OmniChat</footer>
+  </div>
+
+  <!-- ผลรางวัล -->
+  <div id="modal" class="modal hidden">
+    <div class="sheet">
+      <div id="fortuneBox"></div>
+      <div id="prizeBox"></div>
+      <div id="couponBox"></div>
+      <button id="againBtn" class="cta">เล่นอีกครั้ง</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/games.js" type="module"></script>
+</body>
+</html>
