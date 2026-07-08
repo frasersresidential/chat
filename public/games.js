@@ -171,10 +171,10 @@ function buildWheel() {
     `<circle cx="${C}" cy="${C}" r="148" fill="none" stroke="${shade(accent, -0.55)}" stroke-width="1.6"/>` +
     `<circle cx="${C}" cy="${C}" r="134.5" fill="none" stroke="${highlight}" stroke-width="1.2" opacity=".85"/>` +
     bulbs +
-    `<path d="M${C} 46 C${C + 17} 76 ${C + 19} 102 ${C} 116 C${C - 19} 102 ${C - 17} 76 ${C} 46 Z"
-           fill="url(#hubGrad)" stroke="${highlight}" stroke-width="2"/>` +
-    `<circle cx="${C}" cy="${C}" r="48" fill="url(#hubGrad)" stroke="${highlight}" stroke-width="3"/>` +
-    `<circle cx="${C}" cy="${C}" r="41" fill="none" stroke="${highlight}" stroke-width="1" opacity=".55"/>`;
+    // Small sharp pointer triangle rising from behind the top of the GO button.
+    `<path d="M${C} 94 L${C - 12} 138 L${C + 12} 138 Z" fill="url(#hubGrad)" stroke="${highlight}" stroke-width="1.6"/>` +
+    `<circle cx="${C}" cy="${C}" r="34" fill="url(#hubGrad)" stroke="${highlight}" stroke-width="2.2"/>` +
+    `<circle cx="${C}" cy="${C}" r="28.5" fill="none" stroke="${highlight}" stroke-width="1" opacity=".55"/>`;
 
   // Keep the current rotation when the wheel is rebuilt (e.g. theme change).
   const rot = document.getElementById('wheelRot');

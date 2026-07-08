@@ -123,14 +123,14 @@ body[data-pattern="dots"] {
 .hub {
   /* transparent click target over the SVG hub — the visual lives in the SVG */
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 2;
-  width: 96px; height: 96px; border-radius: 50%; cursor: pointer;
+  width: 68px; height: 68px; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   background: none; border: none;
   color: var(--highlight);
   font-family: inherit;
   transition: transform .12s;
 }
-.hub span { font-size: 19px; font-weight: 800; letter-spacing: .1em; margin-right: -.1em; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.hub span { font-size: 15px; font-weight: 800; letter-spacing: .08em; margin-right: -.08em; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .hub:active { transform: translate(-50%,-50%) scale(.94); }
 .hub:disabled { opacity: .55; cursor: not-allowed; }
 .hub:focus-visible { outline: 3px solid var(--accent); outline-offset: -6px; }
