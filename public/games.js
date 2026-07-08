@@ -22,9 +22,9 @@ const $ = (id) => document.getElementById(id);
 const state = { campaign: null, playsLeft: 0, busy: false, rot: 0 };
 
 const ERRORS = {
-  daily_limit: 'วันนี้ใช้สิทธิ์ครบแล้ว พรุ่งนี้กลับมาลุ้นใหม่นะ 🌙',
-  campaign_inactive: 'แคมเปญนี้สิ้นสุดแล้ว ขอบคุณที่ร่วมสนุกค่ะ 🙏',
-  no_prizes: 'ของรางวัลถูกแจกหมดแล้ว ขออภัยด้วยนะคะ',
+  daily_limit: 'สิทธิ์วันนี้หมดแล้ว 😴 พรุ่งนี้มาลุ้นใหม่นะ',
+  campaign_inactive: 'แคมเปญนี้จบไปแล้ว ขอบคุณที่มาร่วมสนุกกัน 🙏',
+  no_prizes: 'รางวัลหมดเกลี้ยงแล้ว ไวกว่านี้มีอีกนะ 😅',
   unknown_game: 'เกมนี้ไม่เปิดให้เล่นในแคมเปญนี้',
 };
 
@@ -53,8 +53,8 @@ function setPlaysLeft(n) {
 }
 
 /* ── เกม 1: วงล้อ ──────────────────────────────────────────────────────────── */
-// Muted lacquer tones; the top-value prize segment is picked out in gold.
-const FALLBACK_COLORS = ['#b2882e', '#22222c', '#1d2733', '#20291f', '#2c2029', '#191920'];
+// Candy-pop palette matching the sticker theme.
+const FALLBACK_COLORS = ['#ffd43a', '#7c5cff', '#45d9ff', '#c6f432', '#ff4d8d', '#1a1428'];
 
 /** Perceived brightness 0-255 from a #rrggbb hex. */
 function brightness(hex) {
@@ -81,23 +81,21 @@ function buildWheel() {
     const [dx, dy] = pt(i * seg, 122); // gold stud on each segment boundary
     const color = p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
     const label = p.label.length > 16 ? p.label.slice(0, 15) + '…' : p.label;
-    const textFill = brightness(color) > 110 ? '#241a08' : '#d9c690';
+    const textFill = brightness(color) > 110 ? '#1a1428' : '#ffffff';
     // Radial labels; flip the left half 180° so no label reads upside-down.
     const textRot = mid > 180 ? mid + 90 : mid - 90;
     return `
       <path d="M${R},${R} L${x0.toFixed(2)},${y0.toFixed(2)} A${r} ${r} 0 ${seg > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z"
-            fill="${color}" stroke="#d4b26a" stroke-width="0.8" opacity="${p.soldOut ? 0.35 : 1}"/>
-      <circle cx="${dx.toFixed(2)}" cy="${dy.toFixed(2)}" r="1.8" fill="#d4b26a" opacity=".9"/>
+            fill="${color}" stroke="#1a1428" stroke-width="2.5" opacity="${p.soldOut ? 0.35 : 1}"/>
+      <circle cx="${dx.toFixed(2)}" cy="${dy.toFixed(2)}" r="2.4" fill="#ffffff" stroke="#1a1428" stroke-width="1.2"/>
       <text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" transform="rotate(${textRot.toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})"
-            text-anchor="middle" dominant-baseline="middle" fill="${textFill}" font-size="11"
-            font-weight="500" letter-spacing=".5">${label}</text>`;
+            text-anchor="middle" dominant-baseline="middle" fill="${textFill}" font-size="11.5"
+            font-weight="700" letter-spacing=".3">${label}</text>`;
   });
   $('wheelSvg').innerHTML =
-    `<circle cx="${R}" cy="${R}" r="${r}" fill="#101016"/>` +
+    `<circle cx="${R}" cy="${R}" r="${r}" fill="#ffffff"/>` +
     parts.join('') +
-    `<circle cx="${R}" cy="${R}" r="${r}" fill="none" stroke="#d4b26a" stroke-width="1" opacity=".55"/>` +
-    `<circle cx="${R}" cy="${R}" r="50" fill="#101015" stroke="#d4b26a" stroke-width="0.8"/>` +
-    `<circle cx="${R}" cy="${R}" r="46" fill="none" stroke="#d4b26a" stroke-width="0.5" opacity=".5"/>`;
+    `<circle cx="${R}" cy="${R}" r="52" fill="#ffffff" stroke="#1a1428" stroke-width="2.5"/>`;
 }
 
 async function spinWheel() {
@@ -174,9 +172,8 @@ function dealCards() {
   }
 }
 
-// Classic engraved glyphs per card — the raw emoji reads too playful here.
-const CARD_GLYPHS = { sun: '☀', star: '✶', moon: '☽', wheel: '✵', lovers: '♥', strength: '♛', world: '❖', fool: '➶' };
-const cardGlyph = (f) => CARD_GLYPHS[f.key] || f.emoji;
+// Emoji card art fits the sticker theme.
+const cardGlyph = (f) => f.emoji;
 
 async function pickCard(el) {
   if (state.busy || el.classList.contains('flipped')) return;
@@ -201,21 +198,18 @@ async function pickCard(el) {
 }
 
 /* ── ผลรางวัล ─────────────────────────────────────────────────────────────── */
-// Restrained gold-sparkle rain instead of party-emoji confetti.
 function confetti() {
-  const glyphs = ['✦', '✧', '·'];
-  const colors = ['#ecd9a8', '#d4b26a', '#a8863d'];
-  for (let i = 0; i < 22; i++) {
+  const glyphs = ['🎉', '✨', '💖', '⚡', '🌟', '💜'];
+  for (let i = 0; i < 26; i++) {
     const s = document.createElement('span');
     s.className = 'confetti';
     s.textContent = glyphs[i % glyphs.length];
     s.style.left = Math.random() * 100 + 'vw';
-    s.style.color = colors[i % colors.length];
-    s.style.fontSize = 9 + Math.random() * 9 + 'px';
-    s.style.animationDuration = 2.6 + Math.random() * 2.4 + 's';
+    s.style.fontSize = 14 + Math.random() * 12 + 'px';
+    s.style.animationDuration = 2.2 + Math.random() * 2.2 + 's';
     s.style.animationDelay = Math.random() * 0.6 + 's';
     document.body.appendChild(s);
-    setTimeout(() => s.remove(), 6000);
+    setTimeout(() => s.remove(), 5500);
   }
 }
 
@@ -238,25 +232,24 @@ function showResult(result) {
 
   if (result.prize.win) {
     $('prizeBox').innerHTML = `
-      <div class="orn">✦ ✦ ✦</div>
-      <div class="prize-title">ยินดีด้วย คุณได้รับ</div>
+      <div class="orn win">ปังมาก! 🎉</div>
+      <div class="prize-title">คุณได้รับ</div>
       <div class="prize-name">${result.prize.label}</div>`;
     confetti();
   } else {
     $('prizeBox').innerHTML = `
-      <div class="orn">✦</div>
-      <div class="prize-title">ครั้งนี้ยังไม่ใช่ของคุณ</div>
+      <div class="orn lose">เกือบแล้ว! 🥲</div>
       <div class="prize-name lose">${result.prize.label}</div>
       <div class="prize-sub">${result.remainingToday > 0
-        ? `ยังเหลือสิทธิ์อีก ${result.remainingToday} ครั้งในวันนี้`
-        : 'พรุ่งนี้กลับมาลุ้นกันใหม่อีกครั้ง'}</div>`;
+        ? `ยังเหลืออีก ${result.remainingToday} ครั้งวันนี้ — จัดต่อเลย`
+        : 'พรุ่งนี้กลับมาแก้มือกันใหม่นะ'}</div>`;
   }
 
   $('couponBox').innerHTML = !result.couponCode ? '' : `
     <div class="coupon">
-      <div class="c-label">โค้ดรับสิทธิ์ของคุณ — คัดลอกหรือบันทึกหน้าจอไว้</div>
+      <div class="c-label">โค้ดของคุณ — ก๊อปเก็บไว้เลย</div>
       <div class="c-code">${result.couponCode}</div>
-      <button id="copyBtn">คัดลอกโค้ด</button>
+      <button id="copyBtn">คัดลอกโค้ด 📋</button>
     </div>`;
   const copy = $('copyBtn');
   if (copy) copy.addEventListener('click', async () => {
@@ -264,7 +257,7 @@ function showResult(result) {
     catch { toast('คัดลอกไม่สำเร็จ กรุณาแคปหน้าจอแทนค่ะ'); }
   });
 
-  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด';
+  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นต่อ 🔥' : 'ปิด';
   $('modal').classList.remove('hidden');
 }
 

@@ -4,21 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <title>Lucky Draw</title>
-  <meta name="theme-color" content="#0c0c11" />
+  <meta name="theme-color" content="#efe9ff" />
   <link rel="icon" type="image/png" href="/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/games.css" />
 </head>
 <body>
   <div id="app">
     <header class="hero">
-      <div class="overline">✦ &nbsp;Lucky Draw&nbsp; ✦</div>
+      <div class="overline">Lucky Draw 🎲</div>
       <h1 id="campaignName">กำลังโหลด…</h1>
       <div class="hairline"></div>
-      <p class="plays">สิทธิ์ลุ้นรางวัลวันนี้ <b id="playsLeft">–</b> ครั้ง</p>
+      <p class="plays">🔥 เหลือสิทธิ์อีก <b id="playsLeft">–</b> ครั้งวันนี้</p>
     </header>
 
     <nav class="tabs" id="tabs">
@@ -39,17 +39,17 @@
     <main id="stage">
       <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
       <section id="game-wheel" class="game">
-        <p class="hint">แตะปุ่มกลางวงล้อ แล้วรอเข็มทองหยุดที่รางวัลของคุณ</p>
+        <p class="hint">จิ้มปุ่ม GO! ตรงกลาง แล้วลุ้นว่าเข็มจะหยุดที่ช่องไหน</p>
         <div class="wheel-wrap">
           <div class="pointer"></div>
           <svg id="wheelSvg" viewBox="0 0 300 300" aria-label="วงล้อรางวัล"></svg>
-          <button id="spinBtn" class="hub"><span>หมุน</span></button>
+          <button id="spinBtn" class="hub"><span>GO!</span></button>
         </div>
       </section>
 
       <!-- ── เกม 2: เซียมซี ───────────────────────────────────────────── -->
       <section id="game-sticks" class="game hidden">
-        <p class="hint">ตั้งจิตอธิษฐานถึงสิ่งที่ปรารถนา แล้วเขย่ากระบอกเพื่อรับคำทำนายพร้อมลุ้นรางวัล</p>
+        <p class="hint">อธิษฐานในใจ แล้วเขย่าให้สุด — ได้ทั้งคำทำนายและลุ้นรางวัล</p>
         <div class="shrine">
           <div id="cylinder" class="cylinder">
             <div class="sticks">
@@ -60,14 +60,14 @@
             <div class="cyl-body"><span class="plaque">เซียมซี<em>เสี่ยงทาย</em></span></div>
           </div>
         </div>
-        <button id="shakeBtn" class="cta">เขย่าเซียมซี</button>
+        <button id="shakeBtn" class="cta">เขย่าเลย 🙏</button>
       </section>
 
       <!-- ── เกม 3: เปิดไพ่ ───────────────────────────────────────────── -->
       <section id="game-cards" class="game hidden">
-        <p class="hint">จิตใจสงบนิ่ง… แล้วเลือกไพ่ที่เรียกหาคุณเพียงหนึ่งใบ</p>
+        <p class="hint">หลับตานับสาม… แล้วเลือกไพ่ที่ใช่สำหรับคุณ 1 ใบ</p>
         <div id="cardRow" class="card-row"></div>
-        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่</button>
+        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่ 🔮</button>
       </section>
     </main>
 
