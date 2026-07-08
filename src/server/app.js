@@ -18,7 +18,7 @@ import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../cor
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
-import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, sanitizeCampaign } from '../core/games.js';
+import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, sanitizeCampaign, THEME_PRESETS } from '../core/games.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -609,6 +609,7 @@ export function createApp() {
   api.post('/notifications/:id/read', (req, res) => res.json(markNotifRead(req.params.id)));
 
   // ── Gamification campaigns (admin side of /api/play) ─────────────────────
+  api.get('/games/presets', (_req, res) => res.json(THEME_PRESETS));
   api.get('/games/campaigns', (req, res) => {
     res.json(db.gameCampaigns.filter((c) => c.organizationId === req.user.organizationId)
       .map((c) => ({ ...c, stats: campaignStats(c.id) })));

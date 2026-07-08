@@ -12,13 +12,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/games.css" />
 </head>
-<body>
+<body data-shadow="soft" data-pattern="none">
   <div id="app">
     <header class="hero">
-      <div class="overline">Lucky Draw 🎲</div>
+      <div class="overline">Lucky Draw</div>
       <h1 id="campaignName">กำลังโหลด…</h1>
       <div class="hairline"></div>
-      <p class="plays">🔥 เหลือสิทธิ์อีก <b id="playsLeft">–</b> ครั้งวันนี้</p>
+      <p class="plays">เหลือสิทธิ์อีก <b id="playsLeft">–</b> ครั้งวันนี้</p>
     </header>
 
     <nav class="tabs" id="tabs">
@@ -39,11 +39,11 @@
     <main id="stage">
       <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
       <section id="game-wheel" class="game">
-        <p class="hint">จิ้มปุ่ม GO! ตรงกลาง แล้วลุ้นว่าเข็มจะหยุดที่ช่องไหน</p>
+        <p class="hint">แตะปุ่ม GO ตรงกลาง แล้วลุ้นว่าเข็มจะหยุดที่รางวัลไหน</p>
         <div class="wheel-wrap">
           <div class="pointer"></div>
           <svg id="wheelSvg" viewBox="0 0 300 300" aria-label="วงล้อรางวัล"></svg>
-          <button id="spinBtn" class="hub"><span>GO!</span></button>
+          <button id="spinBtn" class="hub"><span>GO</span></button>
         </div>
       </section>
 
@@ -60,14 +60,14 @@
             <div class="cyl-body"><span class="plaque">เซียมซี<em>เสี่ยงทาย</em></span></div>
           </div>
         </div>
-        <button id="shakeBtn" class="cta">เขย่าเลย 🙏</button>
+        <button id="shakeBtn" class="cta">เขย่าเซียมซี</button>
       </section>
 
       <!-- ── เกม 3: เปิดไพ่ ───────────────────────────────────────────── -->
       <section id="game-cards" class="game hidden">
         <p class="hint">หลับตานับสาม… แล้วเลือกไพ่ที่ใช่สำหรับคุณ 1 ใบ</p>
         <div id="cardRow" class="card-row"></div>
-        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่ 🔮</button>
+        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่</button>
       </section>
     </main>
 

@@ -41,7 +41,7 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Tags & grading** | Free-form tags + A–F lead grade per conversation; full-text search across chats. |
 | **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
-| **Gamification** | Customer lucky-draw mini-games at `/games.html` — spin-the-wheel, เซียมซี fortune sticks and tarot card flip, all on one server-side prize engine (weighted odds, stock, daily limits, coupon codes). |
+| **Gamification** | Customer lucky-draw mini-games at `/games.html` — spin-the-wheel, เซียมซี fortune sticks and tarot card flip, all on one server-side prize engine (weighted odds, stock, daily limits, coupon codes). A **Games admin tab** edits campaigns, prizes and the full visual theme (presets + per-color pickers, radius/border/shadow/pattern) with no code changes. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
 | **PWA** | Installable, mobile-first; sound + desktop + **Web Push** notifications (reach the phone with the app closed). |

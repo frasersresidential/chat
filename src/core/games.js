@@ -24,6 +24,60 @@ const log = logger('games');
 
 export const GAME_TYPES = ['wheel', 'sticks', 'cards'];
 
+// ── Theming ────────────────────────────────────────────────────────────────
+// The game page is fully token-driven: a campaign carries a theme (preset +
+// color/style overrides) and the client maps it onto CSS variables. Admins
+// pick a preset in the Games tab, then fine-tune any color with a picker.
+export const THEME_PRESETS = {
+  studio: {
+    label: 'Studio',
+    colors: { bg: '#f4f2ec', surface: '#ffffff', ink: '#23212b', muted: '#7a7581', accent: '#4f46e5', accent2: '#23212b', highlight: '#f2b634' },
+    style: { radius: 14, borderWidth: 1.5, shadow: 'soft', pattern: 'none' },
+  },
+  pop: {
+    label: 'Candy Pop',
+    colors: { bg: '#efe9ff', surface: '#ffffff', ink: '#1a1428', muted: '#6f6787', accent: '#ff4d8d', accent2: '#7c5cff', highlight: '#ffd43a' },
+    style: { radius: 18, borderWidth: 2, shadow: 'hard', pattern: 'dots' },
+  },
+  luxe: {
+    label: 'Midnight Luxe',
+    colors: { bg: '#0c0c11', surface: '#16161e', ink: '#ece7db', muted: '#8e897c', accent: '#d4b26a', accent2: '#2e2a3c', highlight: '#ecd9a8' },
+    style: { radius: 6, borderWidth: 1, shadow: 'none', pattern: 'none' },
+  },
+};
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const SHADOWS = ['soft', 'hard', 'none'];
+const PATTERNS = ['none', 'dots'];
+
+/** Merge a theme payload onto a preset base, keeping only valid values. */
+export function sanitizeTheme(body = {}, existing = {}) {
+  const preset = THEME_PRESETS[body.preset] ? body.preset : (THEME_PRESETS[existing.preset] ? existing.preset : 'studio');
+  const base = THEME_PRESETS[preset];
+  const prevColors = existing.colors || {};
+  const prevStyle = existing.style || {};
+  const colors = {};
+  for (const key of Object.keys(base.colors)) {
+    const v = body.colors?.[key] ?? prevColors[key];
+    colors[key] = HEX_RE.test(v || '') ? v.toLowerCase() : base.colors[key];
+  }
+  const s = body.style || {};
+  const num = (v, prev, fallback, min, max) => {
+    const n = Number(v ?? prev);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  };
+  return {
+    preset,
+    colors,
+    style: {
+      radius: num(s.radius, prevStyle.radius, base.style.radius, 0, 32),
+      borderWidth: num(s.borderWidth, prevStyle.borderWidth, base.style.borderWidth, 0, 4),
+      shadow: SHADOWS.includes(s.shadow ?? prevStyle.shadow) ? (s.shadow ?? prevStyle.shadow) : base.style.shadow,
+      pattern: PATTERNS.includes(s.pattern ?? prevStyle.pattern) ? (s.pattern ?? prevStyle.pattern) : base.style.pattern,
+    },
+  };
+}
+
 const couponSuffix = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 // ── Fortune flavour content ─────────────────────────────────────────────────
@@ -71,6 +125,7 @@ export function publicCampaign(campaign) {
     active: campaign.active !== false,
     games: campaign.games || GAME_TYPES,
     limitPerDay: campaign.limitPerDay ?? 3,
+    theme: sanitizeTheme(campaign.theme || {}, campaign.theme || {}),
     prizes: (campaign.prizes || []).map((p) => ({
       id: p.id, label: p.label, win: p.win !== false, color: p.color || null,
       soldOut: p.stock === 0,
@@ -175,6 +230,7 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     active: body.active === undefined ? existing.active !== false : !!body.active,
     games: games.length ? games : GAME_TYPES,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
+    theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
     prizes,
   };
 }

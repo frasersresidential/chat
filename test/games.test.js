@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/store/db.js';
 import { seedIfEmpty } from '../src/store/seed.js';
-import { draw, publicCampaign, remainingToday, campaignStats } from '../src/core/games.js';
+import { draw, publicCampaign, remainingToday, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS } from '../src/core/games.js';
 
 db._reset();
 seedIfEmpty();
@@ -85,6 +85,25 @@ test('inactive campaigns and unknown games are rejected', () => {
   assert.equal(draw({ campaign: { ...campaign(), active: false }, playerId: 'p6', game: 'wheel' }).error, 'campaign_inactive');
   assert.equal(draw({ campaign: campaign(), playerId: 'p6', game: 'slot' }).error, 'unknown_game');
   assert.equal(draw({ campaign: campaign(), playerId: '', game: 'wheel' }).error, 'bad_player');
+});
+
+test('theme: sanitize falls back to preset for bad values and keeps overrides', () => {
+  const t = sanitizeTheme({ preset: 'pop', colors: { accent: '#123abc', bg: 'not-a-color' }, style: { radius: 999, shadow: 'sparkly' } });
+  assert.equal(t.preset, 'pop');
+  assert.equal(t.colors.accent, '#123abc');                       // valid override kept
+  assert.equal(t.colors.bg, THEME_PRESETS.pop.colors.bg);         // invalid → preset value
+  assert.equal(t.style.radius, 32);                               // clamped
+  assert.equal(t.style.shadow, THEME_PRESETS.pop.style.shadow);   // invalid → preset value
+});
+
+test('theme: survives a campaign save round-trip and reaches the public view', () => {
+  const saved = sanitizeCampaign({ name: 'themed', theme: { preset: 'luxe', colors: { highlight: '#ffeecc' } } }, 'org_company_a');
+  assert.equal(saved.theme.preset, 'luxe');
+  assert.equal(saved.theme.colors.highlight, '#ffeecc');
+  const row = db.gameCampaigns.insert(saved);
+  const view = publicCampaign(row);
+  assert.equal(view.theme.colors.highlight, '#ffeecc');
+  assert.equal(view.theme.style.shadow, THEME_PRESETS.luxe.style.shadow);
 });
 
 test('campaign stats aggregate draws', () => {

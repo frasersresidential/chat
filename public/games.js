@@ -52,9 +52,32 @@ function setPlaysLeft(n) {
   $('playsLeft').textContent = n;
 }
 
+/* ── Theme ────────────────────────────────────────────────────────────────── */
+// The campaign's theme (set in the admin Games tab) is mapped onto the CSS
+// variables that games.css is built from.
+const contrastOn = (hex) => (brightness(hex) > 130 ? '#23212b' : '#ffffff');
+
+function applyTheme(t) {
+  if (!t) return;
+  const root = document.documentElement.style;
+  const c = t.colors || {};
+  const map = { bg: '--bg', surface: '--surface', ink: '--ink', muted: '--muted', accent: '--accent', accent2: '--accent2', highlight: '--highlight' };
+  for (const [key, cssVar] of Object.entries(map)) {
+    if (c[key]) root.setProperty(cssVar, c[key]);
+  }
+  if (c.accent) root.setProperty('--on-accent', contrastOn(c.accent));
+  if (c.accent2) root.setProperty('--on-accent2', contrastOn(c.accent2));
+  if (c.highlight) root.setProperty('--on-highlight', contrastOn(c.highlight));
+  if (c.ink) root.setProperty('--on-ink', contrastOn(c.ink));
+  const s = t.style || {};
+  if (s.radius !== undefined) root.setProperty('--radius', s.radius + 'px');
+  if (s.borderWidth !== undefined) root.setProperty('--bw', s.borderWidth + 'px');
+  document.body.dataset.shadow = s.shadow || 'soft';
+  document.body.dataset.pattern = s.pattern || 'none';
+}
+
 /* ── เกม 1: วงล้อ ──────────────────────────────────────────────────────────── */
-// Candy-pop palette matching the sticker theme.
-const FALLBACK_COLORS = ['#ffd43a', '#7c5cff', '#45d9ff', '#c6f432', '#ff4d8d', '#1a1428'];
+const FALLBACK_COLORS = ['#f2b634', '#4f46e5', '#2f9e8f', '#7fa653', '#d95d77', '#2c2a35'];
 
 /** Perceived brightness 0-255 from a #rrggbb hex. */
 function brightness(hex) {
@@ -66,6 +89,9 @@ function brightness(hex) {
 
 function buildWheel() {
   const prizes = state.campaign.prizes;
+  const themeColors = state.campaign.theme?.colors || {};
+  const ink = themeColors.ink || '#23212b';
+  const surface = themeColors.surface || '#ffffff';
   const n = prizes.length;
   const seg = 360 / n;
   const R = 150, r = 140;
@@ -78,24 +104,24 @@ function buildWheel() {
     const [x1, y1] = pt((i + 1) * seg, r);
     const mid = (i + 0.5) * seg;
     const [tx, ty] = pt(mid, 90);
-    const [dx, dy] = pt(i * seg, 122); // gold stud on each segment boundary
+    const [dx, dy] = pt(i * seg, 122); // stud on each segment boundary
     const color = p.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
     const label = p.label.length > 16 ? p.label.slice(0, 15) + '…' : p.label;
-    const textFill = brightness(color) > 110 ? '#1a1428' : '#ffffff';
+    const textFill = brightness(color) > 130 ? '#23212b' : '#ffffff';
     // Radial labels; flip the left half 180° so no label reads upside-down.
     const textRot = mid > 180 ? mid + 90 : mid - 90;
     return `
       <path d="M${R},${R} L${x0.toFixed(2)},${y0.toFixed(2)} A${r} ${r} 0 ${seg > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z"
-            fill="${color}" stroke="#1a1428" stroke-width="2.5" opacity="${p.soldOut ? 0.35 : 1}"/>
-      <circle cx="${dx.toFixed(2)}" cy="${dy.toFixed(2)}" r="2.4" fill="#ffffff" stroke="#1a1428" stroke-width="1.2"/>
+            fill="${color}" stroke="${ink}" stroke-width="2" opacity="${p.soldOut ? 0.35 : 1}"/>
+      <circle cx="${dx.toFixed(2)}" cy="${dy.toFixed(2)}" r="2.2" fill="${surface}" stroke="${ink}" stroke-width="1"/>
       <text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" transform="rotate(${textRot.toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})"
             text-anchor="middle" dominant-baseline="middle" fill="${textFill}" font-size="11.5"
-            font-weight="700" letter-spacing=".3">${label}</text>`;
+            font-weight="600" letter-spacing=".3">${label}</text>`;
   });
   $('wheelSvg').innerHTML =
-    `<circle cx="${R}" cy="${R}" r="${r}" fill="#ffffff"/>` +
+    `<circle cx="${R}" cy="${R}" r="${r}" fill="${surface}"/>` +
     parts.join('') +
-    `<circle cx="${R}" cy="${R}" r="52" fill="#ffffff" stroke="#1a1428" stroke-width="2.5"/>`;
+    `<circle cx="${R}" cy="${R}" r="52" fill="${surface}" stroke="${ink}" stroke-width="2"/>`;
 }
 
 async function spinWheel() {
@@ -232,24 +258,24 @@ function showResult(result) {
 
   if (result.prize.win) {
     $('prizeBox').innerHTML = `
-      <div class="orn win">ปังมาก! 🎉</div>
+      <div class="orn win">ยินดีด้วย 🎉</div>
       <div class="prize-title">คุณได้รับ</div>
       <div class="prize-name">${result.prize.label}</div>`;
     confetti();
   } else {
     $('prizeBox').innerHTML = `
-      <div class="orn lose">เกือบแล้ว! 🥲</div>
+      <div class="orn lose">เกือบได้แล้ว</div>
       <div class="prize-name lose">${result.prize.label}</div>
       <div class="prize-sub">${result.remainingToday > 0
-        ? `ยังเหลืออีก ${result.remainingToday} ครั้งวันนี้ — จัดต่อเลย`
-        : 'พรุ่งนี้กลับมาแก้มือกันใหม่นะ'}</div>`;
+        ? `ยังเหลือสิทธิ์อีก ${result.remainingToday} ครั้งวันนี้`
+        : 'พรุ่งนี้กลับมาลุ้นใหม่อีกครั้ง'}</div>`;
   }
 
   $('couponBox').innerHTML = !result.couponCode ? '' : `
     <div class="coupon">
-      <div class="c-label">โค้ดของคุณ — ก๊อปเก็บไว้เลย</div>
+      <div class="c-label">โค้ดของคุณ — คัดลอกหรือบันทึกหน้าจอเก็บไว้</div>
       <div class="c-code">${result.couponCode}</div>
-      <button id="copyBtn">คัดลอกโค้ด 📋</button>
+      <button id="copyBtn">คัดลอกโค้ด</button>
     </div>`;
   const copy = $('copyBtn');
   if (copy) copy.addEventListener('click', async () => {
@@ -257,7 +283,7 @@ function showResult(result) {
     catch { toast('คัดลอกไม่สำเร็จ กรุณาแคปหน้าจอแทนค่ะ'); }
   });
 
-  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นต่อ 🔥' : 'ปิด';
+  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด';
   $('modal').classList.remove('hidden');
 }
 
@@ -282,6 +308,7 @@ async function init() {
     return;
   }
   $('campaignName').textContent = state.campaign.name;
+  applyTheme(state.campaign.theme);
   setPlaysLeft(state.campaign.remainingToday);
 
   // Show only the game skins this campaign enables.
