@@ -407,6 +407,36 @@ body[data-pattern="dots"] {
   .foot { grid-area: foot; align-self: end; text-align: left; margin-top: 24px; }
 
   /* Game view fits the content column height without overflowing */
-  .wheel-wrap { width: min(56vh, 460px); }
+  .wheel-wrap { width: min(60vh, 500px); }
   .shrine { padding: 90px 0 0; }
+}
+
+/* ── Large desktop: scale the whole kiosk up so it fills the screen ───────── */
+@media (min-width: 1300px) and (orientation: landscape) {
+  #app { max-width: 1440px; column-gap: 88px; padding: 48px 64px; }
+  .overline { font-size: 15px; padding: 8px 26px; }
+  .hero h1 { font-size: 54px; }
+  .plays { font-size: 19px; padding: 10px 26px; margin-top: 24px; }
+  .plays b { font-size: 23px; }
+  .hint { font-size: 19px; max-width: 560px; margin-bottom: 26px; }
+  .cta { font-size: 20px; padding: 19px 62px; }
+  .wheel-wrap { width: min(66vh, 620px); }
+  .hub { width: 120px; height: 120px; }
+  .hub span { font-size: 26px; }
+
+  .entry-card { padding: 52px 60px 48px; gap: 24px 32px; }
+  .entry-title { font-size: 34px; }
+  .entry-sub { font-size: 17px; }
+  .field > span { font-size: 17px; }
+  .field input { font-size: 20px; padding: 18px 22px; }
+  .combo-opt { font-size: 18px; padding: 16px 20px; }
+  .foot { font-size: 12px; }
+}
+
+@media (min-width: 1700px) and (orientation: landscape) {
+  #app { max-width: 1680px; }
+  .hero h1 { font-size: 62px; }
+  .wheel-wrap { width: min(70vh, 720px); }
+  .hub { width: 138px; height: 138px; }
+  .hub span { font-size: 30px; }
 }
