@@ -107,7 +107,7 @@ function buildWheel() {
   const highlight = tc.highlight || '#c9a557';
   const n = prizes.length;
   const seg = 360 / n;
-  const C = 160, segR = 130;
+  const C = 160, segR = 134;
   const pt = (deg, rad) => {
     const a = (deg * Math.PI) / 180;
     return [C + rad * Math.sin(a), C - rad * Math.cos(a)];
@@ -132,10 +132,12 @@ function buildWheel() {
             font-weight="700" letter-spacing=".3">${label}</text>`;
   }).join('');
 
-  // 12 light bulbs around the rim.
-  const bulbs = Array.from({ length: 12 }, (_, i) => {
-    const [x, y] = pt(i * 30, 143);
-    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.4" fill="url(#bulbGrad)" stroke="${shade(accent, -0.5)}" stroke-width=".8"/>`;
+  // 16 light bulbs seated in the (now slimmer) rim. Each carries its index in
+  // --d so the CSS chase animation can stagger them while the wheel spins.
+  const NBULB = 16;
+  const bulbs = Array.from({ length: NBULB }, (_, i) => {
+    const [x, y] = pt(i * (360 / NBULB), 141);
+    return `<circle class="bulb" style="--d:${i}" cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.3" fill="url(#bulbGrad)" stroke="${shade(accent, -0.5)}" stroke-width=".7"/>`;
   }).join('');
 
   const defs = `<defs>
@@ -165,9 +167,9 @@ function buildWheel() {
     `<circle cx="${C}" cy="${C}" r="${segR}" fill="${surface}"/>` +
     `<g id="wheelRot" style="transform-origin:${C}px ${C}px">${segs}</g>` +
     `<circle cx="${C}" cy="${C}" r="${segR}" fill="url(#glossGrad)" pointer-events="none"/>` +
-    `<circle cx="${C}" cy="${C}" r="143" fill="none" stroke="url(#rimGrad)" stroke-width="27"/>` +
-    `<circle cx="${C}" cy="${C}" r="156.5" fill="none" stroke="${shade(accent, -0.55)}" stroke-width="2"/>` +
-    `<circle cx="${C}" cy="${C}" r="129.5" fill="none" stroke="${highlight}" stroke-width="1.4" opacity=".85"/>` +
+    `<circle cx="${C}" cy="${C}" r="141" fill="none" stroke="url(#rimGrad)" stroke-width="14"/>` +
+    `<circle cx="${C}" cy="${C}" r="148" fill="none" stroke="${shade(accent, -0.55)}" stroke-width="1.6"/>` +
+    `<circle cx="${C}" cy="${C}" r="134.5" fill="none" stroke="${highlight}" stroke-width="1.2" opacity=".85"/>` +
     bulbs +
     `<path d="M${C} 46 C${C + 17} 76 ${C + 19} 102 ${C} 116 C${C - 19} 102 ${C - 17} 76 ${C} 46 Z"
            fill="url(#hubGrad)" stroke="${highlight}" stroke-width="2"/>` +
@@ -193,11 +195,14 @@ async function spinWheel() {
     const current = ((state.rot % 360) + 360) % 360;
     state.rot += 360 * 5 + ((target - current + 360) % 360);
     const rot = document.getElementById('wheelRot');
+    const wrap = document.querySelector('.wheel-wrap');
+    wrap.classList.add('spinning'); // kicks off the bulb chase animation
     rot.style.transform = `rotate(${state.rot}deg)`;
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
+      wrap.classList.remove('spinning');
       state.busy = false;
       $('spinBtn').disabled = false;
       showResult(result);
