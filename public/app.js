@@ -1475,7 +1475,13 @@ async function renderGames(main) {
       </select></div>
       <div><label>สถานะ</label><select id="gActive" ${dis}><option value="1" ${c.active !== false ? 'selected' : ''}>เปิดใช้งาน</option><option value="" ${c.active === false ? 'selected' : ''}>ปิด</option></select></div>
       <div><label>สิทธิ์ต่อคนต่อวัน</label><input id="gLimit" type="number" min="1" value="${c.limitPerDay ?? 3}" ${dis} /></div>
-    </div></div>
+      <div><label>ล็อกผลรางวัล (ออกทุกครั้ง)</label><select id="gForced" ${dis}>
+        <option value="">สุ่มตามน้ำหนัก (ปกติ)</option>
+        ${(c.prizes || []).map((p) => `<option value="${p.id}" ${c.forcedPrizeId === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+      </select></div>
+    </div>
+    ${c.forcedPrizeId ? `<p class="muted" style="margin:10px 0 0">🔒 ลิงก์นี้ล็อกให้ออกรางวัล “<b style="color:var(--text)">${esc((c.prizes || []).find((p) => p.id === c.forcedPrizeId)?.label || '')}</b>” ทุกครั้งที่เล่น</p>` : '<p class="muted" style="margin:10px 0 0">💡 อยากได้ลิงก์ที่ออกรางวัลตายตัว (เช่น 100,000 ทุกครั้ง)? เลือกที่ “ล็อกผลรางวัล” — ทำหลายลิงก์แยกรางวัลได้ แล้วเลือกส่งลิงก์ตามรางวัลที่ต้องการ</p>'}
+    </div>
 
     <div class="card">
       <h3>ธีม & สี</h3>
@@ -1632,6 +1638,7 @@ async function renderGames(main) {
         active: !!$('#gActive').value,
         limitPerDay: Number($('#gLimit').value) || 3,
         game: $('#gGame').value,
+        forcedPrizeId: $('#gForced').value || null,
         theme: {
           preset: $('#gPresetVal').value,
           colors,
