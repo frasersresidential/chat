@@ -29,6 +29,17 @@ const GRAPH_VERSION = 'v19.0';
 /** LIVE when an Ad Library access token is configured. */
 export const liveEnabled = () => !!config.adLibraryToken;
 
+/**
+ * Meta's official embeddable preview of the real creative (image/video/carousel
+ * included). Server-side only — the URL carries the access token, so it must
+ * never be stored or sent to the client; the snapshot proxy redirects to it.
+ */
+export function snapshotRenderUrl(ad) {
+  if (!liveEnabled() || !ad?.externalId) return null;
+  return `https://www.facebook.com/ads/archive/render_ad/?id=${encodeURIComponent(ad.externalId)}` +
+    `&access_token=${encodeURIComponent(config.adLibraryToken)}`;
+}
+
 // ── Derived metrics ───────────────────────────────────────────────────────────
 export const daysRunning = (ad) =>
   Math.max(0, Math.floor((Date.now() - new Date(ad.startDate).getTime()) / DAY));
@@ -271,17 +282,20 @@ async function fetchFromLibrary(competitor) {
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/ads_archive?${params}`);
   if (!res.ok) throw new Error(`Ad Library ${res.status}`);
   const { data = [] } = await res.json();
+  // NOTE: we deliberately do NOT store d.ad_snapshot_url — it embeds the access
+  // token in its query string. The real creative is served via our snapshot
+  // proxy (GET /api/ads/:id/snapshot) which builds the render URL server-side,
+  // and the outbound link uses the public token-free Ad Library page instead.
   return data.map((d) => ({
     externalId: d.id,
     pageName: d.page_name || competitor.pageName,
     headline: (d.ad_creative_link_titles || [])[0] || '',
     body: (d.ad_creative_bodies || [])[0] || '',
     cta: (d.ad_creative_link_captions || [])[0] || '',
-    linkUrl: (d.ad_creative_link_captions || [])[0] || '',
+    linkUrl: `https://www.facebook.com/ads/library/?id=${encodeURIComponent(d.id)}`,
     mediaType: 'unknown',
     imageColor: null,
     platforms: d.publisher_platforms || [],
-    snapshotUrl: d.ad_snapshot_url || null,
     startDate: d.ad_delivery_start_time || new Date().toISOString(),
   }));
 }

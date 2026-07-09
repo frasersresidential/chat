@@ -115,8 +115,8 @@ const MEDIA_ICON = { image: '🖼️', video: '🎬', carousel: '🎠', unknown:
 
 function adThumb(ad) {
   const color = ad.imageColor || '#1f6feb';
-  if (ad.snapshotUrl) return `<a class="ad-thumb" href="${esc(ad.snapshotUrl)}" target="_blank" rel="noopener" style="background:${color}"><span>${MEDIA_ICON[ad.mediaType] || '📄'} เปิดใน Ad Library ↗</span></a>`;
-  return `<div class="ad-thumb" style="background:linear-gradient(135deg,${color},${color}bb)"><span>${MEDIA_ICON[ad.mediaType] || '📄'} ${esc(ad.mediaType || '')}</span></div>`;
+  return `<button class="ad-thumb as-btn" data-preview="${ad.id}" style="background:linear-gradient(135deg,${color},${color}bb)" title="โหลดครีเอทีฟจริงของโฆษณานี้">
+    <span>${MEDIA_ICON[ad.mediaType] || '📄'} ▶ ดูครีเอทีฟจริง</span></button>`;
 }
 
 function adCard(ad) {
@@ -137,7 +137,7 @@ function adCard(ad) {
       </div>
       <div class="ad-actions">
         <button class="btn ghost ad-save ${ad.saved ? 'saved' : ''}" data-save="${ad.id}" data-next="${ad.saved ? '0' : '1'}">${ad.saved ? '★ บันทึกแล้ว' : '☆ เก็บเข้าคลัง'}</button>
-        ${ad.linkUrl ? `<a class="btn ghost" href="${esc(ad.linkUrl)}" target="_blank" rel="noopener">🔗 Landing</a>` : ''}
+        ${ad.linkUrl ? `<a class="btn ghost" href="${esc(ad.linkUrl)}" target="_blank" rel="noopener">${ad.linkUrl.includes('facebook.com/ads/library') ? '🔍 Ad Library ↗' : '🔗 Landing'}</a>` : ''}
       </div>
     </div>
   </div>`;
@@ -257,6 +257,16 @@ async function renderBody(box, competitors) {
     try { await api('/ads/' + b.dataset.save + '/save', { method: 'POST', body: JSON.stringify({ saved: b.dataset.next === '1' }) }); }
     catch (e) { return alert(e.message); }
     renderBody(box, competitors);
+  });
+  // Swap the placeholder thumb for Meta's official creative preview on demand
+  // (an iframe per card is heavy, so load only the ones the user asks for).
+  box.querySelectorAll('[data-preview]').forEach((b) => b.onclick = () => {
+    const frame = document.createElement('iframe');
+    frame.className = 'ad-frame';
+    frame.loading = 'lazy';
+    frame.title = 'ตัวอย่างครีเอทีฟโฆษณา';
+    frame.src = `/api/ads/${b.dataset.preview}/snapshot?t=${encodeURIComponent(state.token)}`;
+    b.replaceWith(frame);
   });
 }
 

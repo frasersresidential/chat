@@ -8,6 +8,7 @@ import { vapidPublicKey, saveSubscription, pushEnabled } from './push.js';
 import {
   liveEnabled, listCompetitors, addCompetitor, updateCompetitor, removeCompetitor,
   refreshCompetitor, refreshAll, listAds, winningAds, toggleSaved, insights,
+  snapshotRenderUrl,
 } from './core.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,6 +97,35 @@ export function createApp() {
     const ad = db.ads.get(req.params.id);
     if (!ad) return res.status(404).json({ error: 'not found' });
     res.json(toggleSaved(ad, { saved: req.body.saved, tags: req.body.tags }));
+  });
+
+  // ── Real-creative snapshot proxy ──────────────────────────────────────────
+  // Loaded in an <iframe>, which cannot send an Authorization header, so this
+  // route sits outside the bearer router and authenticates via ?t=<session
+  // token> instead. LIVE: redirect to Meta's official render_ad preview (the
+  // access token is appended server-side and never stored or sent to the SPA).
+  // MOCK: serve a styled placeholder so the preview flow is testable offline.
+  app.get('/api/ads/:id/snapshot', (req, res) => {
+    const t = String(req.query.t || '');
+    if (t !== sessionToken()) return res.status(401).send('unauthorized');
+    const ad = db.ads.get(req.params.id);
+    if (!ad) return res.status(404).send('not found');
+    const render = snapshotRenderUrl(ad);
+    if (render) return res.redirect(render);
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    res.type('html').send(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/></head>
+      <body style="margin:0;font-family:-apple-system,'Noto Sans Thai',sans-serif;background:#fff;color:#1c1e21">
+        <div style="max-width:420px;margin:0 auto;border:1px solid #dadde1">
+          <div style="padding:10px 12px;font-weight:700">${escapeHtml(ad.pageName)} <span style="color:#65676b;font-weight:400;font-size:12px">· Sponsored (ตัวอย่างจำลอง)</span></div>
+          <div style="padding:0 12px 10px;font-size:14px;line-height:1.5">${escapeHtml(ad.body)}</div>
+          <div style="height:230px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;background:linear-gradient(135deg,${escapeHtml(ad.imageColor || '#1f6feb')},#111)">${escapeHtml(ad.headline)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f0f2f5">
+            <span style="font-size:13px;color:#65676b">ในโหมด LIVE ตรงนี้คือครีเอทีฟจริงจาก Meta</span>
+            <span style="border:1px solid #ccd0d5;border-radius:6px;padding:6px 12px;font-weight:600;font-size:13px">${escapeHtml(ad.cta)}</span>
+          </div>
+        </div>
+      </body></html>`);
   });
 
   // ── Web Push ──────────────────────────────────────────────────────────────
