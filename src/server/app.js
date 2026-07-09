@@ -18,7 +18,6 @@ import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../cor
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
-import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, campaignReport, sanitizeCampaign, THEME_PRESETS, enterGate as gameEnter, hasEntered as gameHasEntered } from '../core/games.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -85,38 +84,9 @@ export function createApp() {
   });
   app.use('/api/auth', auth);
 
-  // ── Public lucky-draw games (no token — customers open /games.html from a
-  // broadcast link). The prize is always drawn server-side; see core/games.js.
-  const play = express.Router();
-  play.get('/:id', (req, res) => {
-    const campaign = db.gameCampaigns.get(req.params.id);
-    if (!campaign) return res.status(404).json({ error: 'not found' });
-    const view = publicCampaign(campaign);
-    const playerId = String(req.query.player || '');
-    res.json({
-      ...view,
-      remainingToday: playerId ? remainingToday(campaign, playerId) : view.limitPerDay,
-      entered: playerId ? gameHasEntered(campaign.id, playerId) : false,
-    });
-  });
-  play.post('/:id/enter', (req, res) => {
-    const campaign = db.gameCampaigns.get(req.params.id);
-    if (!campaign) return res.status(404).json({ error: 'not found' });
-    const result = gameEnter({
-      campaign, playerId: String(req.body.playerId || ''),
-      name: req.body.name, phone: req.body.phone, project: req.body.project, plot: req.body.plot, code: req.body.code,
-    });
-    if (result.error) return res.status(400).json(result);
-    res.json(result);
-  });
-  play.post('/:id/draw', (req, res) => {
-    const campaign = db.gameCampaigns.get(req.params.id);
-    if (!campaign) return res.status(404).json({ error: 'not found' });
-    const result = gameDraw({ campaign, playerId: String(req.body.playerId || ''), game: String(req.body.game || '') });
-    if (result.error) return res.status(400).json(result);
-    res.json(result);
-  });
-  app.use('/api/play', play);
+  // Lucky-draw games + reports are a separate tool — see src/studio/ (its own
+  // server, its own /games.html + /api/games routes). The inbox no longer
+  // serves them.
 
   const api = express.Router();
   api.use(authMiddleware);
@@ -621,48 +591,6 @@ export function createApp() {
   // ── Notifications ─────────────────────────────────────────────────────────
   api.get('/notifications', (req, res) => res.json(listNotifications(req.user.id)));
   api.post('/notifications/:id/read', (req, res) => res.json(markNotifRead(req.params.id)));
-
-  // ── Gamification campaigns (admin side of /api/play) ─────────────────────
-  api.get('/games/presets', (_req, res) => res.json(THEME_PRESETS));
-  api.get('/games/campaigns', (req, res) => {
-    res.json(db.gameCampaigns.filter((c) => c.organizationId === req.user.organizationId)
-      .map((c) => ({ ...c, stats: campaignStats(c.id) })));
-  });
-  api.post('/games/campaigns', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
-    res.status(201).json(db.gameCampaigns.insert(sanitizeCampaign(req.body, req.user.organizationId)));
-  });
-  api.post('/games/campaigns/:id', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
-    const cur = db.gameCampaigns.get(req.params.id);
-    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
-    res.json(db.gameCampaigns.update(cur.id, sanitizeCampaign(req.body, cur.organizationId, cur)));
-  });
-  // Registrant report: everyone who filled the form + the prize they won.
-  api.get('/games/campaigns/:id/report', (req, res) => {
-    const cur = db.gameCampaigns.get(req.params.id);
-    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
-    res.json({ stats: campaignStats(cur.id), rows: campaignReport(cur) });
-  });
-
-  // Same report as a downloadable CSV (UTF-8 BOM so Excel reads Thai correctly).
-  api.get('/games/campaigns/:id/report.csv', (req, res) => {
-    const cur = db.gameCampaigns.get(req.params.id);
-    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).send('not found');
-    const rows = campaignReport(cur);
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const header = ['เวลาที่ลงทะเบียน', 'ชื่อ-นามสกุล', 'เบอร์โทร', 'โครงการ', 'แปลง/ยูนิต', 'เล่นแล้ว', 'เกม', 'รางวัลที่ได้', 'ถูกรางวัล', 'โค้ด'];
-    const lines = [header.map(esc).join(',')];
-    for (const r of rows) {
-      lines.push([
-        r.registeredAt, r.name, r.phone, r.project, r.plot,
-        r.played ? 'เล่นแล้ว' : 'ยังไม่ได้เล่น',
-        r.game || '', r.prize || '', r.win == null ? '' : (r.win ? 'ได้รางวัล' : 'ไม่ได้รางวัล'), r.couponCode || '',
-      ].map(esc).join(','));
-    }
-    const csv = '﻿' + lines.join('\r\n');
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="report-${cur.id}.csv"`);
-    res.send(csv);
-  });
 
   app.use('/api', api);
 

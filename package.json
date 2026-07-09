@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "start:studio": "node src/studio/index.js",
+    "dev:studio": "node --watch src/studio/index.js",
     "test": "node --test"
   },
   "dependencies": {
