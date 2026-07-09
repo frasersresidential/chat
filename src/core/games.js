@@ -141,6 +141,7 @@ export function publicCampaign(campaign) {
     active: campaign.active !== false,
     game: campaignGame(campaign),
     limitPerDay: campaign.limitPerDay ?? 3,
+    bannerUrl: campaign.bannerUrl || null,
     theme: sanitizeTheme(campaign.theme || {}, campaign.theme || {}),
     // gate.code is deliberately omitted — the entry form validates it server-side.
     gate: { enabled: !!gate.enabled, projects: gate.projects || [] },
@@ -368,6 +369,10 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
   // name = internal admin label; displayName = the headline customers see.
   const displayName = body.displayName !== undefined
     ? String(body.displayName).slice(0, 120) : (existing.displayName || '');
+  // Optional custom banner image (uploaded PNG/JPG) shown atop the game page.
+  const wantBanner = body.bannerUrl !== undefined ? body.bannerUrl : existing.bannerUrl;
+  const bannerUrl = typeof wantBanner === 'string' && /^(\/uploads\/|https?:\/\/|data:image\/)/.test(wantBanner)
+    ? wantBanner.slice(0, 500) : null;
   return {
     organizationId,
     name: String(body.name || existing.name || 'Lucky Draw').slice(0, 120),
@@ -375,6 +380,7 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     active: body.active === undefined ? existing.active !== false : !!body.active,
     game,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
+    bannerUrl,
     theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
     gate: sanitizeGate(body.gate, existing.gate),
     forcedPrizeId,

@@ -43,6 +43,7 @@ body[data-pattern="dots"] {
 .hero { text-align: center; margin-bottom: 18px; }
 .hero-banner { width: min(88vw, 340px); margin: 0 auto 6px; }
 .hero-banner svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 6px 12px rgba(20,18,30,.16)); }
+.banner-img { width: 100%; height: auto; display: block; border-radius: 12px; filter: drop-shadow(0 6px 14px rgba(20,18,30,.18)); }
 .overline {
   display: inline-block; padding: 6px 18px; margin-bottom: 14px;
   background: var(--accent); color: var(--on-accent); border: var(--bd); border-radius: 999px;

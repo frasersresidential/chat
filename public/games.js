@@ -514,6 +514,15 @@ async function init() {
   }
   $('campaignName').textContent = state.campaign.name;
   applyTheme(state.campaign.theme);
+  // Custom PNG/JPG banner overrides the generated SVG when set in the admin.
+  if (state.campaign.bannerUrl) {
+    const img = document.createElement('img');
+    img.className = 'banner-img';
+    img.src = state.campaign.bannerUrl;
+    img.alt = state.campaign.name || 'campaign banner';
+    const box = $('heroBanner');
+    if (box) { box.innerHTML = ''; box.appendChild(img); }
+  }
 
   // One game per link — the admin picks it; the customer just plays it.
   const game = state.campaign.game || 'wheel';
