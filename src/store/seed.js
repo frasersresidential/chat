@@ -195,7 +195,8 @@ export function seedIfEmpty() {
   const rewardLink = (amount) => db.gameCampaigns.insert({
     id: 'reward_' + amount,
     organizationId: O,
-    name: `ลิงก์รางวัลใหญ่ ${th(amount)} บาท`,
+    name: `ลิงก์รางวัลใหญ่ ${th(amount)} บาท`,          // internal label (staff)
+    displayName: 'ลุ้นโชคกับ Frasers Property',          // what the customer sees
     active: true,
     game: 'wheel',
     limitPerDay: 1,

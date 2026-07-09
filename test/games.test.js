@@ -171,6 +171,17 @@ test('gate: sanitizeCampaign keeps projects list and trims the code', () => {
   assert.deepEqual(saved.gate.projects, ['P1', 'P2']);
 });
 
+test('public view shows displayName, never the internal admin name', () => {
+  const saved = sanitizeCampaign({ name: 'ลิงก์รางวัลใหญ่ 100,000 บาท', displayName: 'ลุ้นโชคกับ Frasers Property', prizes: [] }, 'org_company_a');
+  const row = db.gameCampaigns.insert(saved);
+  const view = publicCampaign(row);
+  assert.equal(view.name, 'ลุ้นโชคกับ Frasers Property');
+  assert.ok(!JSON.stringify(view).includes('ลิงก์รางวัลใหญ่'));
+  // Falls back to name when no displayName is set.
+  const plain = publicCampaign(sanitizeCampaign({ name: 'แคมเปญ X', prizes: [] }, 'org_company_a'));
+  assert.equal(plain.name, 'แคมเปญ X');
+});
+
 test('locked-prize link always awards the chosen prize every play', () => {
   const c = db.gameCampaigns.insert(sanitizeCampaign({
     name: 'ลิงก์รางวัล 100,000', game: 'wheel',

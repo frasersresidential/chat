@@ -1469,7 +1469,8 @@ async function renderGames(main) {
       <div style="grid-column:1/-1"><label>ลิงก์สำหรับลูกค้า</label>
         <div style="display:flex;gap:8px"><input id="gLink" value="${esc(fullUrl)}" readonly style="flex:1" /><button class="btn ghost" id="gCopyLink" type="button">คัดลอก</button></div>
       </div>
-      <div><label>ชื่อแคมเปญ</label><input id="gName" value="${esc(c.name)}" ${dis} /></div>
+      <div><label>ชื่อแคมเปญ (ใช้ในระบบ — ไม่โชว์ลูกค้า)</label><input id="gName" value="${esc(c.name)}" ${dis} /></div>
+      <div><label>ชื่อที่ลูกค้าเห็น (หัวข้อหน้าเกม)</label><input id="gDisplay" value="${esc(c.displayName || '')}" placeholder="เช่น ลุ้นโชคกับ Frasers Property" ${dis} /></div>
       <div><label>เกมของลิงก์นี้</label><select id="gGame" ${dis}>
         ${GAME_OPTS.map(([k, l]) => `<option value="${k}" ${k === cGame ? 'selected' : ''}>${l}</option>`).join('')}
       </select></div>
@@ -1635,6 +1636,7 @@ async function renderGames(main) {
     try {
       await api('/games/campaigns/' + c.id, { method: 'POST', body: JSON.stringify({
         name: $('#gName').value,
+        displayName: $('#gDisplay').value,
         active: !!$('#gActive').value,
         limitPerDay: Number($('#gLimit').value) || 3,
         game: $('#gGame').value,
