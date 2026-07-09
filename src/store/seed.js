@@ -187,6 +187,44 @@ export function seedIfEmpty() {
     ],
   });
 
+  // ── Locked-prize reward links ─────────────────────────────────────────────
+  // 5 ready-made links, each a full "ลุ้น" wheel (small prizes + ขอบคุณ mixed
+  // in) but locked to the big prize so it comes out every play. Sales staff
+  // pick the link matching the prize they want the customer to win.
+  const th = (str) => Number(str).toLocaleString('en-US'); // 100000 -> "100,000"
+  const rewardLink = (amount) => db.gameCampaigns.insert({
+    id: 'reward_' + amount,
+    organizationId: O,
+    name: `ลิงก์รางวัลใหญ่ ${th(amount)} บาท`,
+    active: true,
+    game: 'wheel',
+    limitPerDay: 1,
+    theme: {
+      preset: 'frasers',
+      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
+      style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
+    },
+    gate: {
+      enabled: true,
+      code: 'FP2024',
+      projects: [
+        'The Grand พระราม 9', 'Golden Neo สุขุมวิท', 'Neo Home บางนา',
+        'Grand Park วิภาวดี', 'Frasers Ville รังสิต', 'The Rich รัชดา',
+      ],
+    },
+    // The wheel always stops here — the fillers below are just for show.
+    forcedPrizeId: 'big',
+    prizes: [
+      { id: 'big', label: `รางวัลใหญ่ ${th(amount)} บาท`, win: true, weight: 1, stock: null, color: '#c9a557', couponPrefix: `WIN${amount}` },
+      { id: 'f1', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 1, stock: null, color: '#da291c', couponPrefix: 'GIFT' },
+      { id: 'f2', label: 'ส่วนลด 500 บาท', win: true, weight: 1, stock: null, color: '#f6efe3', couponPrefix: 'D500' },
+      { id: 'f3', label: 'ส่งฟรีทั่วไทย', win: true, weight: 1, stock: null, color: '#da291c', couponPrefix: 'FREESHIP' },
+      { id: 'f4', label: 'ลุ้นใหม่รอบหน้า', win: false, weight: 1, stock: null, color: '#f6efe3' },
+      { id: 'f5', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 1, stock: null, color: '#97231c' },
+    ],
+  });
+  [10000, 20000, 30000, 50000, 100000].forEach(rewardLink);
+
   // ── Auto-replies / chatbot ───────────────────────────────────────────────
   const auto = (type, text, keywords = []) =>
     db.autoReplies.insert({ organizationId: org.id, type, text, keywords, channelAccountId: null, enabled: true });
