@@ -18,6 +18,7 @@ import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../cor
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
+import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, sanitizeCampaign, THEME_PRESETS, enterGate as gameEnter, hasEntered as gameHasEntered } from '../core/games.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -83,6 +84,39 @@ export function createApp() {
     res.json({ token: signToken({ sub: user.id }), user: publicUser(user) });
   });
   app.use('/api/auth', auth);
+
+  // ── Public lucky-draw games (no token — customers open /games.html from a
+  // broadcast link). The prize is always drawn server-side; see core/games.js.
+  const play = express.Router();
+  play.get('/:id', (req, res) => {
+    const campaign = db.gameCampaigns.get(req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not found' });
+    const view = publicCampaign(campaign);
+    const playerId = String(req.query.player || '');
+    res.json({
+      ...view,
+      remainingToday: playerId ? remainingToday(campaign, playerId) : view.limitPerDay,
+      entered: playerId ? gameHasEntered(campaign.id, playerId) : false,
+    });
+  });
+  play.post('/:id/enter', (req, res) => {
+    const campaign = db.gameCampaigns.get(req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not found' });
+    const result = gameEnter({
+      campaign, playerId: String(req.body.playerId || ''),
+      name: req.body.name, phone: req.body.phone, project: req.body.project, plot: req.body.plot, code: req.body.code,
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  });
+  play.post('/:id/draw', (req, res) => {
+    const campaign = db.gameCampaigns.get(req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not found' });
+    const result = gameDraw({ campaign, playerId: String(req.body.playerId || ''), game: String(req.body.game || '') });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  });
+  app.use('/api/play', play);
 
   const api = express.Router();
   api.use(authMiddleware);
@@ -587,6 +621,35 @@ export function createApp() {
   // ── Notifications ─────────────────────────────────────────────────────────
   api.get('/notifications', (req, res) => res.json(listNotifications(req.user.id)));
   api.post('/notifications/:id/read', (req, res) => res.json(markNotifRead(req.params.id)));
+
+  // ── Gamification campaigns (admin side of /api/play) ─────────────────────
+  api.get('/games/presets', (_req, res) => res.json(THEME_PRESETS));
+  api.get('/games/campaigns', (req, res) => {
+    res.json(db.gameCampaigns.filter((c) => c.organizationId === req.user.organizationId)
+      .map((c) => ({ ...c, stats: campaignStats(c.id) })));
+  });
+  api.post('/games/campaigns', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    res.status(201).json(db.gameCampaigns.insert(sanitizeCampaign(req.body, req.user.organizationId)));
+  });
+  api.post('/games/campaigns/:id', requirePerm(PERMISSIONS.MANAGE_AUTOMATION), (req, res) => {
+    const cur = db.gameCampaigns.get(req.params.id);
+    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    res.json(db.gameCampaigns.update(cur.id, sanitizeCampaign(req.body, cur.organizationId, cur)));
+  });
+  api.get('/games/campaigns/:id/draws', (req, res) => {
+    const cur = db.gameCampaigns.get(req.params.id);
+    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
+    const draws = db.gameDraws.filter((d) => d.campaignId === cur.id)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 200);
+    // Join each draw with the registrant's form details (name / project / plot).
+    const entryByPlayer = {};
+    for (const e of db.gameEntries.filter((e) => e.campaignId === cur.id)) entryByPlayer[e.playerId] = e;
+    res.json({
+      stats: campaignStats(cur.id),
+      entries: db.gameEntries.filter((e) => e.campaignId === cur.id).length,
+      draws: draws.map((d) => ({ ...d, player: entryByPlayer[d.playerId] || null })),
+    });
+  });
 
   app.use('/api', api);
 

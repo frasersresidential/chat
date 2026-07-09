@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>Lucky Draw</title>
+  <meta name="theme-color" content="#efe9ff" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/games.css" />
+</head>
+<body data-shadow="soft" data-pattern="none">
+  <div id="app">
+    <header class="hero">
+      <div class="overline">Lucky Draw</div>
+      <h1 id="campaignName">กำลังโหลด…</h1>
+      <div class="hairline"></div>
+      <p class="plays" id="playsLine">เหลือสิทธิ์ลุ้นอีก <b id="playsLeft">–</b> ครั้ง</p>
+    </header>
+
+    <!-- ── หน้าแรก: ฟอร์มลงทะเบียนก่อนเล่น ─────────────────────────── -->
+    <section id="entry" class="entry hidden">
+      <form id="entryForm" class="entry-card" autocomplete="off">
+        <h2 class="entry-title">ลงทะเบียนเข้าร่วมกิจกรรม</h2>
+        <p class="entry-sub">กรอกข้อมูลให้ครบถ้วน แล้วกด “ถัดไป” เพื่อเริ่มลุ้นรางวัล</p>
+
+        <label class="field wide">
+          <span>ชื่อ - นามสกุล</span>
+          <input id="fName" type="text" placeholder="เช่น สมชาย ใจดี" required />
+        </label>
+
+        <label class="field wide">
+          <span>เบอร์โทรศัพท์</span>
+          <input id="fPhone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="15" placeholder="กรอกเฉพาะตัวเลข เช่น 0812345678" required />
+        </label>
+
+        <label class="field combo" id="projField">
+          <span>โครงการ</span>
+          <input id="fProject" type="text" placeholder="พิมพ์เพื่อค้นหา แล้วเลือกโครงการ" autocomplete="off" required />
+          <div id="projList" class="combo-list hidden"></div>
+        </label>
+
+        <label class="field">
+          <span>แปลง / ยูนิต</span>
+          <input id="fPlot" type="text" placeholder="เช่น A-12" required />
+        </label>
+
+        <label class="field wide">
+          <span>Code เข้าร่วมกิจกรรม</span>
+          <input id="fCode" type="text" placeholder="กรอกรหัสที่ได้รับจากเจ้าหน้าที่" required />
+        </label>
+
+        <div id="entryErr" class="entry-err hidden wide"></div>
+        <button type="submit" id="entryNext" class="cta primary block wide">ถัดไป →</button>
+      </form>
+    </section>
+
+    <!-- ── หน้าเกม (แสดงหลังผ่านฟอร์ม) ─────────────────────────────── -->
+    <div id="playArea" class="hidden">
+    <main id="stage">
+      <!-- ── เกม 1: วงล้อ ─────────────────────────────────────────────── -->
+      <section id="game-wheel" class="game">
+        <p class="hint">แตะปุ่ม GO ตรงกลาง แล้วลุ้นว่าเข็มจะหยุดที่รางวัลไหน</p>
+        <div class="wheel-wrap">
+          <svg id="wheelSvg" viewBox="0 0 320 320" aria-label="วงล้อรางวัล"></svg>
+          <button id="spinBtn" class="hub"><span>GO</span></button>
+        </div>
+      </section>
+
+      <!-- ── เกม 2: เซียมซี ───────────────────────────────────────────── -->
+      <section id="game-sticks" class="game hidden">
+        <p class="hint">อธิษฐานในใจ แล้วเขย่าให้สุด — ได้ทั้งคำทำนายและลุ้นรางวัล</p>
+        <div class="shrine">
+          <div id="cylinder" class="cylinder">
+            <div class="sticks">
+              <i></i><i></i><i></i><i></i><i></i><i></i>
+              <i id="luckyStick" class="lucky"><b id="stickNum"></b></i>
+              <i></i><i></i><i></i>
+            </div>
+            <div class="cyl-body"><span class="plaque">เซียมซี<em>เสี่ยงทาย</em></span></div>
+          </div>
+        </div>
+        <button id="shakeBtn" class="cta">เขย่าเซียมซี</button>
+      </section>
+
+      <!-- ── เกม 3: เปิดไพ่ ───────────────────────────────────────────── -->
+      <section id="game-cards" class="game hidden">
+        <p class="hint">หลับตานับสาม… แล้วเลือกไพ่ที่ใช่สำหรับคุณ 1 ใบ</p>
+        <div id="cardRow" class="card-row"></div>
+        <button id="redealBtn" class="cta hidden">สับไพ่ใหม่</button>
+      </section>
+    </main>
+    </div><!-- /playArea -->
+
+    <footer class="foot">Powered by OmniChat</footer>
+  </div>
+
+  <!-- ผลรางวัล -->
+  <div id="modal" class="modal hidden">
+    <div class="sheet">
+      <div id="fortuneBox"></div>
+      <div id="prizeBox"></div>
+      <div id="couponBox"></div>
+      <button id="againBtn" class="cta primary">เล่นอีกครั้ง</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/games.js" type="module"></script>
+</body>
+</html>

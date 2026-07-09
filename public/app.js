@@ -300,6 +300,7 @@ function render() {
   if (state.view === 'projects') return renderProjects(main);
   if (state.view === 'automation') return renderAutomation(main);
   if (state.view === 'broadcast') return renderBroadcast(main);
+  if (state.view === 'games') return renderGames(main);
   if (state.view === 'reports') return renderReports(main);
   if (state.view === 'simulator') return renderSimulator(main);
 }
@@ -1424,6 +1425,237 @@ async function renderReports(main) {
 }
 function gradeColor(g) {
   return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';
+}
+
+// ── Games (lucky-draw campaigns) ────────────────────────────────────────────────
+let gamesSelectedId = null;
+
+async function renderGames(main) {
+  const [campaigns, presets] = await Promise.all([api('/games/campaigns'), api('/games/presets')]);
+  const manage = can('manage_automation');
+  const c = campaigns.find((x) => x.id === gamesSelectedId) || campaigns[0];
+
+  if (!c) {
+    main.innerHTML = `<div class="admin"><h2>Games — Lucky Draw</h2>
+      <p class="muted">ยังไม่มีแคมเปญเกมสุ่มรางวัล</p>
+      ${manage ? '<button class="btn" id="gNew">+ สร้างแคมเปญ</button>' : ''}</div>`;
+    if (manage) $('#gNew').onclick = createGameCampaign(main);
+    return;
+  }
+  gamesSelectedId = c.id;
+  const t = c.theme || { colors: {}, style: {} };
+  const gate = c.gate || { enabled: false, code: '', projects: [] };
+  const entriesCount = c.stats?.entries ?? 0;
+  const dis = manage ? '' : 'disabled';
+  const COLOR_LABELS = {
+    bg: 'พื้นหลัง', surface: 'พื้นการ์ด', ink: 'ตัวอักษร / เส้นขอบ', muted: 'ตัวอักษรรอง',
+    accent: 'สีหลัก (ปุ่ม / เข็ม / ป้าย)', accent2: 'สีรอง (แท็บ / กระบอกเซียมซี / หลังไพ่)', highlight: 'สีไฮไลต์ (ปุ่ม GO / ใบเซียมซี)',
+  };
+  const playUrl = `/games.html?c=${encodeURIComponent(c.id)}`;
+  const fullUrl = location.origin + playUrl;
+  const cGame = c.game || (Array.isArray(c.games) && c.games[0]) || 'wheel';
+  const GAME_OPTS = [['wheel', 'วงล้อ (Spin Wheel)'], ['sticks', 'เซียมซี'], ['cards', 'เปิดไพ่ (Tarot)']];
+
+  main.innerHTML = `<div class="admin">
+    <h2>Games — Lucky Draw</h2>
+    <p class="muted">1 แคมเปญ = 1 ลิงก์ = 1 เกม — เลือกเกม, ตั้งรางวัล/ธีม/โค้ดของแต่ละลิงก์แยกกัน แล้วส่งลิงก์ให้ลูกค้าผ่าน Broadcast (แนบ <code>?u=&lt;รหัสลูกค้า&gt;</code> เพื่อผูกสิทธิ์รายวัน)</p>
+
+    <div class="card"><div class="form-grid">
+      <div><label>แคมเปญ (ลิงก์)</label><select id="gSel">${campaigns.map((x) => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        ${manage ? '<button class="btn ghost" id="gNew">+ สร้างลิงก์ใหม่</button>' : ''}
+        <a class="btn" href="${playUrl}" target="_blank">เปิดหน้าเกม ↗</a>
+      </div>
+      <div style="grid-column:1/-1"><label>ลิงก์สำหรับลูกค้า</label>
+        <div style="display:flex;gap:8px"><input id="gLink" value="${esc(fullUrl)}" readonly style="flex:1" /><button class="btn ghost" id="gCopyLink" type="button">คัดลอก</button></div>
+      </div>
+      <div><label>ชื่อแคมเปญ</label><input id="gName" value="${esc(c.name)}" ${dis} /></div>
+      <div><label>เกมของลิงก์นี้</label><select id="gGame" ${dis}>
+        ${GAME_OPTS.map(([k, l]) => `<option value="${k}" ${k === cGame ? 'selected' : ''}>${l}</option>`).join('')}
+      </select></div>
+      <div><label>สถานะ</label><select id="gActive" ${dis}><option value="1" ${c.active !== false ? 'selected' : ''}>เปิดใช้งาน</option><option value="" ${c.active === false ? 'selected' : ''}>ปิด</option></select></div>
+      <div><label>สิทธิ์ต่อคนต่อวัน</label><input id="gLimit" type="number" min="1" value="${c.limitPerDay ?? 3}" ${dis} /></div>
+    </div></div>
+
+    <div class="card">
+      <h3>ธีม & สี</h3>
+      <p class="muted">เลือกชุดสำเร็จ แล้วปรับแต่ละสีต่อได้ — การเปลี่ยนแปลงมีผลกับหน้าเกมทันทีหลังบันทึก</p>
+      <div style="display:flex;gap:8px;margin:10px 0 14px;flex-wrap:wrap">
+        ${Object.entries(presets).map(([k, p]) => `<button class="btn ghost gPreset" data-preset="${k}" ${dis}
+          style="border-color:${k === t.preset ? 'var(--accent)' : ''}">
+          <span style="display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle">
+            ${['bg', 'accent', 'accent2', 'highlight'].map((ck) => `<i style="width:11px;height:11px;border-radius:3px;background:${p.colors[ck]};border:1px solid #0003"></i>`).join('')}
+          </span>${p.label}</button>`).join('')}
+      </div>
+      <input type="hidden" id="gPresetVal" value="${t.preset || 'studio'}" />
+      <div class="form-grid">
+        ${Object.entries(COLOR_LABELS).map(([k, label]) => `
+          <div><label>${label}</label><div style="display:flex;gap:8px;align-items:center">
+            <input type="color" class="gColor" data-key="${k}" value="${t.colors?.[k] || '#ffffff'}" ${dis} style="width:44px;height:32px;padding:2px;border-radius:6px;border:1px solid #4443;background:none;cursor:pointer" />
+            <code class="gColorHex" data-key="${k}">${t.colors?.[k] || ''}</code>
+          </div></div>`).join('')}
+        <div><label>มุมโค้ง (px)</label><input id="gRadius" type="number" min="0" max="32" value="${t.style?.radius ?? 14}" ${dis} /></div>
+        <div><label>ความหนาเส้นขอบ (px)</label><input id="gBorder" type="number" min="0" max="4" step="0.5" value="${t.style?.borderWidth ?? 1.5}" ${dis} /></div>
+        <div><label>สไตล์เงา</label><select id="gShadow" ${dis}>
+          ${[['soft', 'นุ่ม (soft)'], ['hard', 'ตัดแข็งแบบสติกเกอร์ (hard)'], ['none', 'ไม่มีเงา']].map(([v, l]) => `<option value="${v}" ${t.style?.shadow === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>ลายพื้นหลัง</label><select id="gPattern" ${dis}>
+          ${[['none', 'เรียบ'], ['dots', 'ลายจุด']].map(([v, l]) => `<option value="${v}" ${t.style?.pattern === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>รางวัล & โอกาสออก</h3>
+      <p class="muted">weight = น้ำหนักการสุ่ม (ยิ่งมากยิ่งออกบ่อย) · สต็อกเว้นว่าง = ไม่จำกัด · สีใช้กับช่องบนวงล้อ</p>
+      <table id="gPrizeTable">
+        <thead><tr><th>รางวัล</th><th style="width:70px">weight</th><th style="width:70px">สต็อก</th><th style="width:52px">ถูกรางวัล</th><th style="width:56px">สี</th><th style="width:110px">prefix โค้ด</th>${manage ? '<th style="width:36px"></th>' : ''}</tr></thead>
+        <tbody>${(c.prizes || []).map((p, i) => gamePrizeRow(p, i, manage)).join('')}</tbody>
+      </table>
+      ${manage ? '<button class="btn ghost" id="gAddPrize" style="margin-top:10px">+ เพิ่มรางวัล</button>' : ''}
+    </div>
+
+    <div class="card">
+      <h3>หน้าลงทะเบียนก่อนเล่น</h3>
+      <p class="muted">เปิดใช้เพื่อบังคับให้ลูกค้ากรอกฟอร์ม (ชื่อ-นามสกุล / โครงการ / แปลง) และใส่ Code ให้ตรงก่อนถึงจะเข้าเล่นได้</p>
+      <div class="form-grid">
+        <div><label>บังคับลงทะเบียน</label><select id="gGateOn" ${dis}>
+          <option value="1" ${gate.enabled ? 'selected' : ''}>เปิด (ต้องกรอกฟอร์ม + Code)</option>
+          <option value="" ${!gate.enabled ? 'selected' : ''}>ปิด (เข้าเล่นได้เลย)</option>
+        </select></div>
+        <div><label>Code เข้าร่วมกิจกรรม</label><input id="gGateCode" value="${esc(gate.code || '')}" placeholder="เช่น FP2024" ${dis} /></div>
+        <div style="grid-column:1/-1"><label>รายชื่อโครงการ (บรรทัดละ 1 โครงการ — ใช้เป็น picklist ค้นหา)</label>
+          <textarea id="gGateProjects" rows="5" ${dis} style="width:100%;font-family:inherit;padding:10px;border-radius:8px;border:1px solid var(--border,#3a3a4a);background:var(--card,#1b1b24);color:inherit">${esc((gate.projects || []).join('\n'))}</textarea></div>
+      </div>
+    </div>
+
+    <div class="card"><h3>สถิติ</h3>
+      <p>ลงทะเบียน <b>${c.stats?.entries ?? entriesCount}</b> คน · เล่นทั้งหมด <b>${c.stats?.totalDraws ?? 0}</b> ครั้ง · ถูกรางวัล <b>${c.stats?.wins ?? 0}</b> ครั้ง · ผู้เล่น <b>${c.stats?.uniquePlayers ?? 0}</b> คน</p>
+      <button class="btn ghost" id="gViewEntries" style="margin-top:8px">ดูรายชื่อผู้ลงทะเบียน + ผลรางวัล</button>
+      <div id="gEntriesBox" style="margin-top:12px"></div>
+    </div>
+
+    ${manage ? '<button class="btn" id="gSave">บันทึกแคมเปญ</button> <span id="gSaveMsg" class="muted"></span>' : ''}
+  </div>`;
+
+  $('#gSel').onchange = () => { gamesSelectedId = $('#gSel').value; renderGames(main); };
+  $('#gCopyLink').onclick = async () => {
+    try { await navigator.clipboard.writeText($('#gLink').value); $('#gCopyLink').textContent = '✓ คัดลอกแล้ว'; }
+    catch { $('#gLink').select(); }
+  };
+
+  $('#gViewEntries').onclick = async () => {
+    const box = $('#gEntriesBox');
+    box.innerHTML = '<p class="muted">กำลังโหลด…</p>';
+    try {
+      const { draws } = await api('/games/campaigns/' + c.id + '/draws');
+      if (!draws.length) { box.innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; return; }
+      box.innerHTML = `<table><thead><tr><th>เวลา</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>โครงการ</th><th>แปลง</th><th>ผล</th><th>โค้ด</th></tr></thead>
+        <tbody>${draws.map((d) => `<tr>
+          <td>${new Date(d.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+          <td>${esc(d.player?.name || '—')}</td>
+          <td>${esc(d.player?.phone || '—')}</td>
+          <td>${esc(d.player?.project || '—')}</td>
+          <td>${esc(d.player?.plot || '—')}</td>
+          <td>${d.win ? '<span class="pill">ได้รางวัล</span>' : '—'}</td>
+          <td>${d.couponCode ? `<code>${esc(d.couponCode)}</code>` : '—'}</td>
+        </tr>`).join('')}</tbody></table>`;
+    } catch (e) { box.innerHTML = `<p class="muted">โหลดไม่สำเร็จ: ${esc(e.message)}</p>`; }
+  };
+
+  if (!manage) return;
+
+  $('#gNew').onclick = createGameCampaign(main);
+  $('#gAddPrize').onclick = () => {
+    const tbody = main.querySelector('#gPrizeTable tbody');
+    tbody.insertAdjacentHTML('beforeend', gamePrizeRow({ label: 'รางวัลใหม่', weight: 10, stock: null, win: true, color: '#4f46e5', couponPrefix: 'LUCKY' }, tbody.children.length, true));
+    bindPrizeRowDeletes(main);
+  };
+  bindPrizeRowDeletes(main);
+
+  // Preset chip → fill the pickers (saved on บันทึก, not before).
+  main.querySelectorAll('.gPreset').forEach((b) => b.onclick = () => {
+    const p = presets[b.dataset.preset];
+    $('#gPresetVal').value = b.dataset.preset;
+    main.querySelectorAll('.gColor').forEach((inp) => {
+      inp.value = p.colors[inp.dataset.key];
+      main.querySelector(`.gColorHex[data-key="${inp.dataset.key}"]`).textContent = p.colors[inp.dataset.key];
+    });
+    $('#gRadius').value = p.style.radius;
+    $('#gBorder').value = p.style.borderWidth;
+    $('#gShadow').value = p.style.shadow;
+    $('#gPattern').value = p.style.pattern;
+    main.querySelectorAll('.gPreset').forEach((x) => x.style.borderColor = x === b ? 'var(--accent)' : '');
+  });
+  main.querySelectorAll('.gColor').forEach((inp) => inp.oninput = () => {
+    main.querySelector(`.gColorHex[data-key="${inp.dataset.key}"]`).textContent = inp.value;
+  });
+
+  $('#gSave').onclick = async () => {
+    const colors = {};
+    main.querySelectorAll('.gColor').forEach((inp) => colors[inp.dataset.key] = inp.value);
+    const prizes = [...main.querySelectorAll('#gPrizeTable tbody tr')].map((tr) => ({
+      id: tr.dataset.id || undefined,
+      label: tr.querySelector('.pLabel').value,
+      weight: Number(tr.querySelector('.pWeight').value) || 1,
+      stock: tr.querySelector('.pStock').value === '' ? null : Number(tr.querySelector('.pStock').value),
+      win: tr.querySelector('.pWin').checked,
+      color: tr.querySelector('.pColor').value,
+      couponPrefix: tr.querySelector('.pPrefix').value.trim() || null,
+    }));
+    try {
+      await api('/games/campaigns/' + c.id, { method: 'POST', body: JSON.stringify({
+        name: $('#gName').value,
+        active: !!$('#gActive').value,
+        limitPerDay: Number($('#gLimit').value) || 3,
+        game: $('#gGame').value,
+        theme: {
+          preset: $('#gPresetVal').value,
+          colors,
+          style: { radius: Number($('#gRadius').value), borderWidth: Number($('#gBorder').value), shadow: $('#gShadow').value, pattern: $('#gPattern').value },
+        },
+        gate: {
+          enabled: !!$('#gGateOn').value,
+          code: $('#gGateCode').value.trim(),
+          projects: $('#gGateProjects').value.split('\n').map((s) => s.trim()).filter(Boolean),
+        },
+        prizes,
+      }) });
+      $('#gSaveMsg').textContent = '✓ บันทึกแล้ว — เปิดหน้าเกมเพื่อดูผล';
+      setTimeout(() => renderGames(main), 700);
+    } catch (e) { alert(e.message); }
+  };
+}
+
+function gamePrizeRow(p, i, manage) {
+  const dis = manage ? '' : 'disabled';
+  return `<tr data-id="${p.id || ''}">
+    <td><input class="pLabel" value="${esc(p.label || '')}" ${dis} /></td>
+    <td><input class="pWeight" type="number" min="0" value="${p.weight ?? 1}" ${dis} /></td>
+    <td><input class="pStock" type="number" min="0" value="${p.stock ?? ''}" placeholder="∞" ${dis} /></td>
+    <td style="text-align:center"><input class="pWin" type="checkbox" ${p.win !== false ? 'checked' : ''} ${dis} /></td>
+    <td><input class="pColor" type="color" value="${p.color || '#4f46e5'}" ${dis} style="width:36px;height:28px;padding:1px;border:1px solid #4443;border-radius:5px;background:none;cursor:pointer" /></td>
+    <td><input class="pPrefix" value="${esc(p.couponPrefix || '')}" ${dis} /></td>
+    ${manage ? '<td><button class="btn ghost pDel">✕</button></td>' : ''}
+  </tr>`;
+}
+
+function bindPrizeRowDeletes(main) {
+  main.querySelectorAll('.pDel').forEach((b) => b.onclick = () => b.closest('tr').remove());
+}
+
+function createGameCampaign(main) {
+  return async () => {
+    const created = await api('/games/campaigns', { method: 'POST', body: JSON.stringify({
+      name: 'แคมเปญใหม่',
+      prizes: [
+        { label: 'ส่วนลด 100 บาท', weight: 10, stock: null, win: true, color: '#4f46e5', couponPrefix: 'LUCKY100' },
+        { label: 'ขอบคุณที่ร่วมสนุก', weight: 30, stock: null, win: false, color: '#2c2a35' },
+      ],
+    }) });
+    gamesSelectedId = created.id;
+    renderGames(main);
+  };
 }
 
 // ── Simulator ────────────────────────────────────────────────────────────────────
