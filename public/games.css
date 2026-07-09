@@ -403,7 +403,11 @@ body[data-pattern="dots"] {
   #entry, #playArea { grid-area: content; align-self: center; width: 100%; }
   /* Keep the form a comfortable width even though the game (wheel) fills the column */
   .entry { justify-content: center; margin-top: 0; }
-  .entry-card { max-width: 560px; }
+  .entry-card { max-width: 440px; padding: 30px 30px 26px; }
+  .entry-title { font-size: 22px; }
+  .entry-sub { font-size: 13px; }
+  .field > span { font-size: 13.5px; }
+  .field input { font-size: 15px; padding: 12px 14px; }
 
   .foot { grid-area: foot; align-self: end; text-align: left; margin-top: 24px; }
 
@@ -425,9 +429,9 @@ body[data-pattern="dots"] {
   .hub { width: 120px; height: 120px; }
   .hub span { font-size: 26px; }
 
-  /* Form stays modest — only nudge up slightly, don't blow it up */
-  .entry-card { max-width: 580px; padding: 40px 46px 36px; gap: 20px 24px; }
-  .entry-title { font-size: 28px; }
+  /* Form stays compact — the wheel is the hero, not the form */
+  .entry-card { max-width: 460px; padding: 32px 34px 28px; gap: 18px 22px; }
+  .entry-title { font-size: 23px; }
   .foot { font-size: 12px; }
 }
 
