@@ -1529,9 +1529,13 @@ async function renderGames(main) {
       </div>
     </div>
 
-    <div class="card"><h3>สถิติ</h3>
-      <p>ลงทะเบียน <b>${c.stats?.entries ?? entriesCount}</b> คน · เล่นทั้งหมด <b>${c.stats?.totalDraws ?? 0}</b> ครั้ง · ถูกรางวัล <b>${c.stats?.wins ?? 0}</b> ครั้ง · ผู้เล่น <b>${c.stats?.uniquePlayers ?? 0}</b> คน</p>
-      <button class="btn ghost" id="gViewEntries" style="margin-top:8px">ดูรายชื่อผู้ลงทะเบียน + ผลรางวัล</button>
+    <div class="card"><h3>ผู้ลงทะเบียน &amp; ผลรางวัล</h3>
+      <p class="muted">รายชื่อทุกคนที่กรอกฟอร์มเข้ามา พร้อมรางวัลที่หมุนได้ — ดาวน์โหลดเป็น CSV เปิดใน Excel ได้</p>
+      <p>ลงทะเบียน <b>${c.stats?.entries ?? entriesCount}</b> คน · เล่นแล้ว <b>${c.stats?.totalDraws ?? 0}</b> คน · ถูกรางวัล <b>${c.stats?.wins ?? 0}</b> คน</p>
+      <div class="row" style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost" id="gViewEntries">แสดงรายชื่อ + ผลรางวัล</button>
+        <button class="btn" id="gExportCsv">⬇ ดาวน์โหลด CSV</button>
+      </div>
       <div id="gEntriesBox" style="margin-top:12px"></div>
     </div>
 
@@ -1544,23 +1548,42 @@ async function renderGames(main) {
     catch { $('#gLink').select(); }
   };
 
+  const fmtWhen = (iso) => iso ? new Date(iso).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
   $('#gViewEntries').onclick = async () => {
     const box = $('#gEntriesBox');
     box.innerHTML = '<p class="muted">กำลังโหลด…</p>';
     try {
-      const { draws } = await api('/games/campaigns/' + c.id + '/draws');
-      if (!draws.length) { box.innerHTML = '<p class="muted">ยังไม่มีข้อมูล</p>'; return; }
-      box.innerHTML = `<table><thead><tr><th>เวลา</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>โครงการ</th><th>แปลง</th><th>ผล</th><th>โค้ด</th></tr></thead>
-        <tbody>${draws.map((d) => `<tr>
-          <td>${new Date(d.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-          <td>${esc(d.player?.name || '—')}</td>
-          <td>${esc(d.player?.phone || '—')}</td>
-          <td>${esc(d.player?.project || '—')}</td>
-          <td>${esc(d.player?.plot || '—')}</td>
-          <td>${d.win ? '<span class="pill">ได้รางวัล</span>' : '—'}</td>
-          <td>${d.couponCode ? `<code>${esc(d.couponCode)}</code>` : '—'}</td>
-        </tr>`).join('')}</tbody></table>`;
+      const { rows } = await api('/games/campaigns/' + c.id + '/report');
+      if (!rows.length) { box.innerHTML = '<p class="muted">ยังไม่มีผู้ลงทะเบียน</p>'; return; }
+      box.innerHTML = `<div style="overflow-x:auto"><table><thead><tr><th>ลงทะเบียน</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>โครงการ</th><th>แปลง</th><th>เกม</th><th>รางวัลที่ได้</th><th>โค้ด</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr>
+          <td>${fmtWhen(r.registeredAt)}</td>
+          <td>${esc(r.name || '—')}</td>
+          <td>${esc(r.phone || '—')}</td>
+          <td>${esc(r.project || '—')}</td>
+          <td>${esc(r.plot || '—')}</td>
+          <td>${r.played ? esc(r.game || '') : '<span class="muted">ยังไม่ได้เล่น</span>'}</td>
+          <td>${!r.played ? '—' : r.win ? `<span class="pill">${esc(r.prize || 'ได้รางวัล')}</span>` : esc(r.prize || 'ไม่ได้รางวัล')}</td>
+          <td>${r.couponCode ? `<code>${esc(r.couponCode)}</code>` : '—'}</td>
+        </tr>`).join('')}</tbody></table></div>`;
     } catch (e) { box.innerHTML = `<p class="muted">โหลดไม่สำเร็จ: ${esc(e.message)}</p>`; }
+  };
+
+  $('#gExportCsv').onclick = async () => {
+    const btn = $('#gExportCsv'); const old = btn.textContent; btn.textContent = 'กำลังสร้าง…'; btn.disabled = true;
+    try {
+      const res = await fetch('/api/games/campaigns/' + c.id + '/report.csv', {
+        headers: { authorization: state.token ? 'Bearer ' + state.token : '' },
+      });
+      if (!res.ok) throw new Error('export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `report-${c.id}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { alert('ดาวน์โหลดไม่สำเร็จ: ' + e.message); }
+    finally { btn.textContent = old; btn.disabled = false; }
   };
 
   if (!manage) return;

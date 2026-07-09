@@ -297,6 +297,47 @@ export function campaignStats(campaignId) {
   };
 }
 
+/**
+ * Full registrant report: every person who filled the form (even if they
+ * haven't spun yet), joined with the draw they made and the prize they won.
+ * Rows are newest-registration first.
+ */
+export function campaignReport(campaign) {
+  const draws = db.gameDraws.filter((d) => d.campaignId === campaign.id);
+  const drawByPhone = {}, drawByPlayer = {};
+  for (const d of draws) { if (d.phone) drawByPhone[d.phone] = d; drawByPlayer[d.playerId] = d; }
+  const prizeLabel = (id) => (campaign.prizes || []).find((p) => p.id === id)?.label || id || '';
+  const gameLabel = { wheel: 'วงล้อ', sticks: 'เซียมซี', cards: 'เปิดไพ่' };
+
+  const entries = db.gameEntries.filter((e) => e.campaignId === campaign.id);
+  const rows = entries.map((e) => {
+    const d = (e.phone && drawByPhone[e.phone]) || drawByPlayer[e.playerId] || null;
+    return {
+      registeredAt: e.createdAt,
+      name: e.name || '', phone: e.phone || '', project: e.project || '', plot: e.plot || '',
+      played: !!d,
+      playedAt: d?.createdAt || null,
+      game: d ? (gameLabel[d.game] || d.game) : null,
+      prize: d ? prizeLabel(d.prizeId) : null,
+      win: d ? !!d.win : null,
+      couponCode: d?.couponCode || null,
+    };
+  });
+  // Include any draws whose registration is missing (e.g. ungated campaigns).
+  const seenPhones = new Set(entries.map((e) => e.phone).filter(Boolean));
+  const seenPlayers = new Set(entries.map((e) => e.playerId));
+  for (const d of draws) {
+    if ((d.phone && seenPhones.has(d.phone)) || seenPlayers.has(d.playerId)) continue;
+    rows.push({
+      registeredAt: d.createdAt, name: '(ไม่มีข้อมูลลงทะเบียน)', phone: d.phone || '', project: '', plot: '',
+      played: true, playedAt: d.createdAt, game: gameLabel[d.game] || d.game,
+      prize: prizeLabel(d.prizeId), win: !!d.win, couponCode: d.couponCode || null,
+    });
+  }
+  rows.sort((a, b) => (a.registeredAt < b.registeredAt ? 1 : -1));
+  return rows;
+}
+
 /** Normalize a campaign payload from the admin API. */
 export function sanitizeCampaign(body, organizationId, existing = {}) {
   const prizes = Array.isArray(body.prizes) ? body.prizes.map((p, i) => ({
