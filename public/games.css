@@ -41,6 +41,8 @@ body[data-pattern="dots"] {
 
 /* ── Header ── */
 .hero { text-align: center; margin-bottom: 18px; }
+.hero-banner { width: min(88vw, 340px); margin: 0 auto 6px; }
+.hero-banner svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 6px 12px rgba(20,18,30,.16)); }
 .overline {
   display: inline-block; padding: 6px 18px; margin-bottom: 14px;
   background: var(--accent); color: var(--on-accent); border: var(--bd); border-radius: 999px;
@@ -341,7 +343,7 @@ body[data-pattern="dots"] {
 /* ── iPad / tablet: scale up the whole experience for a larger touch screen ── */
 @media (min-width: 768px) {
   #app { max-width: 720px; padding: 48px 32px 60px; }
-  .overline { font-size: 13px; padding: 7px 22px; }
+  .hero-banner { width: min(70vw, 380px); }
   .hero h1 { font-size: 34px; }
   .plays { font-size: 16px; margin-top: 16px; padding: 8px 20px; }
   .plays b { font-size: 19px; }
@@ -396,6 +398,7 @@ body[data-pattern="dots"] {
     grid-template-areas: "hero content" "foot content";
   }
   .hero { grid-area: hero; align-self: center; text-align: left; margin: 0; }
+  .hero-banner { margin: 0 0 12px; width: min(34vw, 360px); }
   .hero h1 { font-size: 42px; line-height: 1.25; }
   .hero .hairline { margin: 18px 0 14px; }
   .plays { margin-top: 20px; }
@@ -419,7 +422,7 @@ body[data-pattern="dots"] {
 /* ── Large desktop: scale the whole kiosk up so it fills the screen ───────── */
 @media (min-width: 1300px) and (orientation: landscape) {
   #app { max-width: 1440px; column-gap: 88px; padding: 48px 64px; }
-  .overline { font-size: 15px; padding: 8px 26px; }
+  .hero-banner { width: 420px; }
   .hero h1 { font-size: 54px; }
   .plays { font-size: 19px; padding: 10px 26px; margin-top: 24px; }
   .plays b { font-size: 23px; }

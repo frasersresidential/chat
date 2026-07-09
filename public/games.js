@@ -81,6 +81,73 @@ function applyTheme(t) {
   if (s.borderWidth !== undefined) root.setProperty('--bw', s.borderWidth + 'px');
   document.body.dataset.shadow = s.shadow || 'soft';
   document.body.dataset.pattern = s.pattern || 'none';
+  buildBanner(c);
+}
+
+/* ── Decorative campaign banner (SVG, theme-coloured) ──────────────────────── */
+function buildBanner(c = {}) {
+  const svg = $('bannerSvg');
+  if (!svg) return;
+  const red = c.accent || '#da291c';
+  const gold = c.highlight || '#c9a557';
+  const ink = c.ink || '#333f48';
+  const surface = c.surface || '#ffffff';
+  // 4-point sparkle centred at (cx,cy)
+  const spark = (cx, cy, s, fill, op = 1) =>
+    `<path transform="translate(${cx} ${cy})" opacity="${op}" fill="${fill}"
+       d="M0 ${-s} C ${s * 0.16} ${-s * 0.16} ${s * 0.16} ${-s * 0.16} ${s} 0 C ${s * 0.16} ${s * 0.16} ${s * 0.16} ${s * 0.16} 0 ${s} C ${-s * 0.16} ${s * 0.16} ${-s * 0.16} ${s * 0.16} ${-s} 0 C ${-s * 0.16} ${-s * 0.16} ${-s * 0.16} ${-s * 0.16} 0 ${-s} Z"/>`;
+  const coin = (cx, cy, r) => `<g transform="translate(${cx} ${cy})">
+      <ellipse cx="0" cy="${r * 0.32}" rx="${r}" ry="${r * 0.9}" fill="${shade(gold, -0.42)}"/>
+      <circle r="${r}" fill="url(#coinG)" stroke="${shade(gold, -0.28)}" stroke-width="1"/>
+      <circle r="${r * 0.66}" fill="none" stroke="${shade(gold, -0.22)}" stroke-width="1" opacity=".7"/>
+      <text y="${r * 0.42}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="${r * 1.15}" font-weight="800" fill="${shade(gold, -0.42)}">฿</text>
+    </g>`;
+  const confetti = [
+    [128, 34, red], [232, 30, gold], [96, 52, gold], [268, 52, red], [150, 20, ink], [214, 18, red],
+  ].map(([x, y, f], i) => `<rect x="${x}" y="${y}" width="7" height="7" rx="1.5" fill="${f}" opacity=".85" transform="rotate(${i * 33} ${x + 3} ${y + 3})"/>`).join('');
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="ribbonG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${shade(red, 0.16)}"/>
+        <stop offset="1" stop-color="${shade(red, -0.18)}"/>
+      </linearGradient>
+      <radialGradient id="coinG" cx="38%" cy="30%" r="78%">
+        <stop offset="0" stop-color="${shade(gold, 0.6)}"/>
+        <stop offset="55%" stop-color="${gold}"/>
+        <stop offset="100%" stop-color="${shade(gold, -0.32)}"/>
+      </radialGradient>
+      <linearGradient id="txtG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff"/>
+        <stop offset="1" stop-color="${shade(gold, 0.75)}"/>
+      </linearGradient>
+    </defs>
+
+    <!-- confetti + sparkles -->
+    ${confetti}
+    ${spark(180, 16, 7, gold)}${spark(112, 26, 5, gold, .9)}${spark(248, 22, 6, gold, .9)}
+
+    <!-- gift box (left) -->
+    <g transform="translate(60 18)">
+      <rect x="0" y="16" width="44" height="30" rx="4" fill="${red}" stroke="${gold}" stroke-width="1.6"/>
+      <rect x="-4" y="9" width="52" height="12" rx="3" fill="${shade(red, 0.14)}" stroke="${gold}" stroke-width="1.6"/>
+      <rect x="18" y="9" width="8" height="37" fill="${gold}"/>
+      <path d="M22 9 C 8 -6 -1 7 22 9 C 45 7 36 -6 22 9 Z" fill="${gold}" stroke="${shade(gold, -0.25)}" stroke-width=".8"/>
+    </g>
+
+    <!-- coins (right) -->
+    ${coin(286, 40, 15)}${coin(268, 30, 12)}${coin(300, 26, 10)}
+
+    <!-- ribbon banner -->
+    <path d="M34 76 L58 76 L58 104 L34 104 L44 90 Z" fill="${shade(red, -0.3)}"/>
+    <path d="M326 76 L302 76 L302 104 L326 104 L316 90 Z" fill="${shade(red, -0.3)}"/>
+    <rect x="52" y="62" width="256" height="46" rx="9" fill="url(#ribbonG)" stroke="${gold}" stroke-width="2.4"/>
+    <rect x="57" y="67" width="246" height="36" rx="6" fill="none" stroke="${gold}" stroke-width="1" opacity=".5"/>
+    ${spark(66, 85, 5, gold)}${spark(294, 85, 5, gold)}
+    <text x="180" y="93" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="25" font-weight="800" letter-spacing="4" fill="url(#txtG)" style="paint-order:stroke;stroke:${shade(red, -0.4)};stroke-width:.6px">LUCKY DRAW</text>
+
+    <!-- little sparkles under banner -->
+    ${spark(150, 124, 5, gold, .85)}${spark(210, 126, 4, gold, .7)}${spark(180, 132, 6, red, .8)}`;
 }
 
 /* ── เกม 1: วงล้อ ──────────────────────────────────────────────────────────── */
