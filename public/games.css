@@ -401,8 +401,9 @@ body[data-pattern="dots"] {
   .plays { margin-top: 20px; }
 
   #entry, #playArea { grid-area: content; align-self: center; width: 100%; }
-  .entry { justify-content: stretch; margin-top: 0; }
-  .entry-card { max-width: none; }
+  /* Keep the form a comfortable width even though the game (wheel) fills the column */
+  .entry { justify-content: center; margin-top: 0; }
+  .entry-card { max-width: 560px; }
 
   .foot { grid-area: foot; align-self: end; text-align: left; margin-top: 24px; }
 
@@ -424,12 +425,9 @@ body[data-pattern="dots"] {
   .hub { width: 120px; height: 120px; }
   .hub span { font-size: 26px; }
 
-  .entry-card { padding: 52px 60px 48px; gap: 24px 32px; }
-  .entry-title { font-size: 34px; }
-  .entry-sub { font-size: 17px; }
-  .field > span { font-size: 17px; }
-  .field input { font-size: 20px; padding: 18px 22px; }
-  .combo-opt { font-size: 18px; padding: 16px 20px; }
+  /* Form stays modest — only nudge up slightly, don't blow it up */
+  .entry-card { max-width: 580px; padding: 40px 46px 36px; gap: 20px 24px; }
+  .entry-title { font-size: 28px; }
   .foot { font-size: 12px; }
 }
 
