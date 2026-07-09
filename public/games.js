@@ -421,8 +421,27 @@ function showResult(result) {
     catch { toast('คัดลอกไม่สำเร็จ กรุณาแคปหน้าจอแทนค่ะ'); }
   });
 
-  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด';
+  // Gated = one spin per registration: send the player back to the form for the
+  // next person. Ungated campaigns keep the repeat-play behaviour.
+  $('againBtn').textContent = state.campaign?.gate?.enabled
+    ? 'เริ่มรอบใหม่ · ลงทะเบียนคนถัดไป'
+    : (result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด');
   $('modal').classList.remove('hidden');
+}
+
+// Reset the form and return to the registration screen for the next player.
+// The device keeps its player id; the server still blocks any phone that has
+// already played (one phone = one spin), so the next round needs a new number.
+function startNewRound() {
+  for (const id of ['fName', 'fPhone', 'fProject', 'fPlot', 'fCode']) {
+    const el = $(id);
+    if (el) el.value = '';
+  }
+  $('entryErr').classList.add('hidden');
+  $('projList').classList.add('hidden');
+  if (state.campaign) state.campaign.entered = false;
+  $('entryNext').disabled = false;
+  showEntry();
 }
 
 /* ── หน้าแรก: ฟอร์มลงทะเบียน + ค้นหาโครงการ ────────────────────────────────── */
@@ -537,6 +556,9 @@ async function init() {
   $('againBtn').addEventListener('click', () => {
     $('modal').classList.add('hidden');
     $('cylinder').classList.remove('revealed');
+    // 1 form = 1 play: gated campaigns return to the registration form so the
+    // next person must register again (and one phone can play only once).
+    if (state.campaign?.gate?.enabled) startNewRound();
   });
 
   // Gate: registered players (or gate-off campaigns) skip straight to the game.
