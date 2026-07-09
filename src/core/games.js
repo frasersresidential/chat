@@ -135,7 +135,9 @@ export function publicCampaign(campaign) {
   const gate = campaign.gate || {};
   return {
     id: campaign.id,
-    name: campaign.name,
+    // Customers see displayName (falls back to name); the internal admin name
+    // — e.g. "ลิงก์รางวัลใหญ่ 100,000" — is never sent to the player.
+    name: campaign.displayName || campaign.name,
     active: campaign.active !== false,
     game: campaignGame(campaign),
     limitPerDay: campaign.limitPerDay ?? 3,
@@ -363,9 +365,13 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
   // references a prize that exists in this campaign; '' / null clears the lock.
   const wantForced = body.forcedPrizeId !== undefined ? body.forcedPrizeId : existing.forcedPrizeId;
   const forcedPrizeId = wantForced && prizes.some((p) => p.id === wantForced) ? wantForced : null;
+  // name = internal admin label; displayName = the headline customers see.
+  const displayName = body.displayName !== undefined
+    ? String(body.displayName).slice(0, 120) : (existing.displayName || '');
   return {
     organizationId,
     name: String(body.name || existing.name || 'Lucky Draw').slice(0, 120),
+    displayName,
     active: body.active === undefined ? existing.active !== false : !!body.active,
     game,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
