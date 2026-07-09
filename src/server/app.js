@@ -18,7 +18,7 @@ import { buildPendingSummary, sendDailyReport, defaultDailyReport } from '../cor
 import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
-import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, sanitizeCampaign, THEME_PRESETS, enterGate as gameEnter, hasEntered as gameHasEntered } from '../core/games.js';
+import { draw as gameDraw, publicCampaign, remainingToday, campaignStats, campaignReport, sanitizeCampaign, THEME_PRESETS, enterGate as gameEnter, hasEntered as gameHasEntered } from '../core/games.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
@@ -636,19 +636,32 @@ export function createApp() {
     if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
     res.json(db.gameCampaigns.update(cur.id, sanitizeCampaign(req.body, cur.organizationId, cur)));
   });
-  api.get('/games/campaigns/:id/draws', (req, res) => {
+  // Registrant report: everyone who filled the form + the prize they won.
+  api.get('/games/campaigns/:id/report', (req, res) => {
     const cur = db.gameCampaigns.get(req.params.id);
     if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).json({ error: 'not found' });
-    const draws = db.gameDraws.filter((d) => d.campaignId === cur.id)
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 200);
-    // Join each draw with the registrant's form details (name / project / plot).
-    const entryByPlayer = {};
-    for (const e of db.gameEntries.filter((e) => e.campaignId === cur.id)) entryByPlayer[e.playerId] = e;
-    res.json({
-      stats: campaignStats(cur.id),
-      entries: db.gameEntries.filter((e) => e.campaignId === cur.id).length,
-      draws: draws.map((d) => ({ ...d, player: entryByPlayer[d.playerId] || null })),
-    });
+    res.json({ stats: campaignStats(cur.id), rows: campaignReport(cur) });
+  });
+
+  // Same report as a downloadable CSV (UTF-8 BOM so Excel reads Thai correctly).
+  api.get('/games/campaigns/:id/report.csv', (req, res) => {
+    const cur = db.gameCampaigns.get(req.params.id);
+    if (!cur || cur.organizationId !== req.user.organizationId) return res.status(404).send('not found');
+    const rows = campaignReport(cur);
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['เวลาที่ลงทะเบียน', 'ชื่อ-นามสกุล', 'เบอร์โทร', 'โครงการ', 'แปลง/ยูนิต', 'เล่นแล้ว', 'เกม', 'รางวัลที่ได้', 'ถูกรางวัล', 'โค้ด'];
+    const lines = [header.map(esc).join(',')];
+    for (const r of rows) {
+      lines.push([
+        r.registeredAt, r.name, r.phone, r.project, r.plot,
+        r.played ? 'เล่นแล้ว' : 'ยังไม่ได้เล่น',
+        r.game || '', r.prize || '', r.win == null ? '' : (r.win ? 'ได้รางวัล' : 'ไม่ได้รางวัล'), r.couponCode || '',
+      ].map(esc).join(','));
+    }
+    const csv = '﻿' + lines.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="report-${cur.id}.csv"`);
+    res.send(csv);
   });
 
   app.use('/api', api);

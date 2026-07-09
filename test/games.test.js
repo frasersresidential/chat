@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/store/db.js';
 import { seedIfEmpty } from '../src/store/seed.js';
-import { draw, publicCampaign, remainingPlays, campaignStats, sanitizeTheme, sanitizeCampaign, THEME_PRESETS, enterGate, hasEntered } from '../src/core/games.js';
+import { draw, publicCampaign, remainingPlays, campaignStats, campaignReport, sanitizeTheme, sanitizeCampaign, THEME_PRESETS, enterGate, hasEntered } from '../src/core/games.js';
 
 db._reset();
 seedIfEmpty();
@@ -169,6 +169,29 @@ test('gate: sanitizeCampaign keeps projects list and trims the code', () => {
   assert.equal(saved.gate.enabled, true);
   assert.equal(saved.gate.code, 'ABC1');
   assert.deepEqual(saved.gate.projects, ['P1', 'P2']);
+});
+
+test('report lists registrants with the prize they won, incl. not-yet-played', () => {
+  const rc = db.gameCampaigns.insert({
+    organizationId: 'org_company_a', name: 'r', active: true, game: 'wheel', limitPerDay: 1,
+    gate: { enabled: true, code: 'RPT', projects: [] },
+    prizes: [{ id: 'big', label: 'ทองคำ', win: true, weight: 1, stock: null, couponPrefix: 'GOLD' }],
+  });
+  // Two register; only one spins.
+  enterGate({ campaign: rc, playerId: 'r1', name: 'ผู้เล่นหนึ่ง', phone: '0811111111', project: 'โครงการ A', plot: 'A-1', code: 'RPT' });
+  enterGate({ campaign: rc, playerId: 'r2', name: 'ผู้เล่นสอง', phone: '0822222222', project: 'โครงการ B', plot: 'B-2', code: 'RPT' });
+  draw({ campaign: db.gameCampaigns.get(rc.id), playerId: 'r1', game: 'wheel' });
+
+  const rows = campaignReport(db.gameCampaigns.get(rc.id));
+  assert.equal(rows.length, 2);
+  const played = rows.find((x) => x.phone === '0811111111');
+  const notYet = rows.find((x) => x.phone === '0822222222');
+  assert.equal(played.played, true);
+  assert.equal(played.prize, 'ทองคำ');
+  assert.match(played.couponCode, /^GOLD-/);
+  assert.equal(played.name, 'ผู้เล่นหนึ่ง');
+  assert.equal(notYet.played, false);
+  assert.equal(notYet.prize, null);
 });
 
 test('campaign stats aggregate draws', () => {
