@@ -253,11 +253,17 @@ export function draw({ campaign, playerId, game }) {
     if (drawsToday(campaign.id, playerId).length >= limit) return { error: 'daily_limit' };
   }
 
-  const prize = weightedPick(campaign.prizes || []);
+  // Locked-prize links always award the chosen prize (every play); otherwise
+  // fall back to the weighted random pool.
+  let prize = null;
+  const forced = campaign.forcedPrizeId
+    ? (campaign.prizes || []).find((p) => p.id === campaign.forcedPrizeId) : null;
+  if (forced) prize = forced;
+  else prize = weightedPick(campaign.prizes || []);
   if (!prize) return { error: 'no_prizes' };
 
-  // Decrement finite stock on the campaign document itself.
-  if (typeof prize.stock === 'number') {
+  // Decrement finite stock — but a locked prize is treated as unlimited.
+  if (!forced && typeof prize.stock === 'number') {
     const prizes = campaign.prizes.map((p) => (p.id === prize.id ? { ...p, stock: p.stock - 1 } : p));
     db.gameCampaigns.update(campaign.id, { prizes });
   }
@@ -353,6 +359,10 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
   const game = GAME_TYPES.includes(body.game) ? body.game
     : (Array.isArray(body.games) && GAME_TYPES.includes(body.games[0]) ? body.games[0]
       : campaignGame(existing));
+  // Locked prize: force one prize to come out every play. Valid only if it
+  // references a prize that exists in this campaign; '' / null clears the lock.
+  const wantForced = body.forcedPrizeId !== undefined ? body.forcedPrizeId : existing.forcedPrizeId;
+  const forcedPrizeId = wantForced && prizes.some((p) => p.id === wantForced) ? wantForced : null;
   return {
     organizationId,
     name: String(body.name || existing.name || 'Lucky Draw').slice(0, 120),
@@ -361,6 +371,7 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
     theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
     gate: sanitizeGate(body.gate, existing.gate),
+    forcedPrizeId,
     prizes,
   };
 }

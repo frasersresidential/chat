@@ -171,6 +171,37 @@ test('gate: sanitizeCampaign keeps projects list and trims the code', () => {
   assert.deepEqual(saved.gate.projects, ['P1', 'P2']);
 });
 
+test('locked-prize link always awards the chosen prize every play', () => {
+  const c = db.gameCampaigns.insert(sanitizeCampaign({
+    name: 'ลิงก์รางวัล 100,000', game: 'wheel',
+    forcedPrizeId: 'p100k',
+    prizes: [
+      { id: 'p100k', label: 'รางวัล 100,000', win: true, weight: 1, stock: 3, couponPrefix: 'M100K' },
+      { id: 'psmall', label: 'ของที่ระลึก', win: true, weight: 999, stock: null },
+      { id: 'plose', label: 'ขอบคุณ', win: false, weight: 999, stock: null },
+    ],
+  }, 'org_company_a'));
+  assert.equal(c.forcedPrizeId, 'p100k');
+  // Even with tiny weight, the locked prize comes out every time.
+  for (let i = 0; i < 8; i++) {
+    const r = draw({ campaign: db.gameCampaigns.get(c.id), playerId: 'lock' + i, game: 'wheel' });
+    assert.equal(r.prize.label, 'รางวัล 100,000');
+    assert.match(r.couponCode, /^M100K-/);
+  }
+  // Locked prize is treated as unlimited — stock isn't drained below its start.
+  assert.equal(db.gameCampaigns.get(c.id).prizes.find((p) => p.id === 'p100k').stock, 3);
+});
+
+test('clearing the lock returns to weighted random', () => {
+  const base = sanitizeCampaign({ name: 'x', forcedPrizeId: 'a', prizes: [{ id: 'a', label: 'A', win: true, weight: 1 }] }, 'org_company_a');
+  assert.equal(base.forcedPrizeId, 'a');
+  const cleared = sanitizeCampaign({ name: 'x', forcedPrizeId: '', prizes: [{ id: 'a', label: 'A', win: true, weight: 1 }] }, 'org_company_a', base);
+  assert.equal(cleared.forcedPrizeId, null);
+  // An id that doesn't exist in prizes is rejected.
+  const bad = sanitizeCampaign({ name: 'x', forcedPrizeId: 'ghost', prizes: [{ id: 'a', label: 'A', win: true, weight: 1 }] }, 'org_company_a');
+  assert.equal(bad.forcedPrizeId, null);
+});
+
 test('report lists registrants with the prize they won, incl. not-yet-played', () => {
   const rc = db.gameCampaigns.insert({
     organizationId: 'org_company_a', name: 'r', active: true, game: 'wheel', limitPerDay: 1,
