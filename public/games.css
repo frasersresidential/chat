@@ -446,3 +446,34 @@ body[data-pattern="dots"] {
   .hub { width: 138px; height: 138px; }
   .hub span { font-size: 30px; }
 }
+
+/* ── Full-page promo background (responsive) ───────────────────────────────
+   Set by games.js when the campaign has bgDesktopUrl / bgMobileUrl. The image
+   already carries the branding, so we hide the in-page banner + title and
+   move the game into the empty area (right on desktop, bottom on portrait). */
+body.bgimg {
+  background: var(--bgm) top center / cover no-repeat fixed;
+  background-color: #f6c9dc;
+}
+@media (min-aspect-ratio: 1/1) {
+  body.bgimg { background-image: var(--bgd); background-position: center; }
+}
+body.bgimg .hero-banner,
+body.bgimg .hero h1,
+body.bgimg .hairline { display: none; }
+body.bgimg .hero { margin: 0 0 10px; }
+
+/* portrait (tablet / phone): kiosk is up top → push the game to the lower pink area */
+@media (max-aspect-ratio: 1/1) {
+  body.bgimg #app { min-height: 100vh; justify-content: flex-end; padding-top: 52vh; }
+}
+/* landscape (desktop / tablet): kiosk is on the left → move the game to the right
+   pink area. Force a single column so the split-kiosk grid above doesn't apply. */
+@media (min-aspect-ratio: 1/1) {
+  body.bgimg #app {
+    display: flex; flex-direction: column; justify-content: center;
+    margin-left: auto; margin-right: max(6vw, 40px);
+    max-width: 440px; padding: 28px 20px;
+  }
+  body.bgimg .hero { text-align: center; margin: 0 0 12px; }
+}

@@ -136,6 +136,20 @@ async function renderGames(main) {
           <input type="hidden" id="gBanner" value="${esc(c.bannerUrl || '')}" />
         </div>
       </div>
+      <div style="grid-column:1/-1"><label>ภาพพื้นหลังเต็มจอ (ถ้าใส่ จะแทนแบนเนอร์ — วางเกมในพื้นที่ว่างอัตโนมัติ)</label>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div id="gBgDPrev">${c.bgDesktopUrl ? `<img src="${esc(c.bgDesktopUrl)}" alt="bg-desktop" style="height:54px;border-radius:6px;border:1px solid var(--border)">` : '<span class="muted">เดสก์ท็อป (แนวนอน)</span>'}</div>
+            ${manage ? '<input type="file" id="gBgDFile" accept="image/png,image/jpeg,image/webp" /><button class="btn ghost" id="gBgDClear" type="button">ลบ</button>' : ''}
+            <input type="hidden" id="gBgD" value="${esc(c.bgDesktopUrl || '')}" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div id="gBgMPrev">${c.bgMobileUrl ? `<img src="${esc(c.bgMobileUrl)}" alt="bg-mobile" style="height:54px;border-radius:6px;border:1px solid var(--border)">` : '<span class="muted">มือถือ/iPad (แนวตั้ง)</span>'}</div>
+            ${manage ? '<input type="file" id="gBgMFile" accept="image/png,image/jpeg,image/webp" /><button class="btn ghost" id="gBgMClear" type="button">ลบ</button>' : ''}
+            <input type="hidden" id="gBgM" value="${esc(c.bgMobileUrl || '')}" />
+          </div>
+        </div>
+      </div>
     </div>
     ${c.forcedPrizeId ? `<p class="muted" style="margin:10px 0 0">🔒 ลิงก์นี้ล็อกให้ออกรางวัล “<b style="color:var(--text)">${esc((c.prizes || []).find((p) => p.id === c.forcedPrizeId)?.label || '')}</b>” ทุกครั้งที่เล่น</p>` : '<p class="muted" style="margin:10px 0 0">💡 อยากได้ลิงก์ที่ออกรางวัลตายตัว (เช่น 100,000 ทุกครั้ง)? เลือกที่ “ล็อกผลรางวัล” — ทำหลายลิงก์แยกรางวัลได้ แล้วเลือกส่งลิงก์ตามรางวัลที่ต้องการ</p>'}
     </div>
@@ -205,30 +219,36 @@ async function renderGames(main) {
 
   $('#gSel').onchange = () => { state.selectedId = $('#gSel').value; renderGames(main); };
   $('#gGoReports').onclick = () => { state.view = 'reports'; $('#nav').querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.view === 'reports')); render(); };
-  const gBannerFile = $('#gBannerFile');
-  if (gBannerFile) gBannerFile.onchange = async () => {
-    const file = gBannerFile.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 5MB กรุณาย่อรูปก่อน'); return; }
-    $('#gBannerPrev').innerHTML = '<span class="muted">กำลังอัปโหลด…</span>';
-    try {
-      const res = await fetch('/api/uploads', {
-        method: 'POST',
-        headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name), authorization: state.token ? 'Bearer ' + state.token : '' },
-        body: file,
-      });
-      if (!res.ok) throw new Error('upload failed');
-      const { url } = await res.json();
-      $('#gBanner').value = url;
-      $('#gBannerPrev').innerHTML = `<img src="${esc(url)}" alt="banner" style="height:60px;border-radius:6px;border:1px solid var(--border)">`;
-    } catch (e) { $('#gBannerPrev').innerHTML = `<span class="muted">อัปโหลดไม่สำเร็จ: ${esc(e.message)}</span>`; }
+  // Wire an image picker → /api/uploads → hidden input + thumbnail preview.
+  const wireUpload = (fileId, hiddenId, prevId, emptyMsg, thumbH = 60) => {
+    const fileEl = $(fileId);
+    if (fileEl) fileEl.onchange = async () => {
+      const file = fileEl.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert('ไฟล์ใหญ่เกิน 5MB กรุณาย่อรูปก่อน'); return; }
+      $(prevId).innerHTML = '<span class="muted">กำลังอัปโหลด…</span>';
+      try {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name), authorization: state.token ? 'Bearer ' + state.token : '' },
+          body: file,
+        });
+        if (!res.ok) throw new Error('upload failed');
+        const { url } = await res.json();
+        $(hiddenId).value = url;
+        $(prevId).innerHTML = `<img src="${esc(url)}" alt="preview" style="height:${thumbH}px;border-radius:6px;border:1px solid var(--border)">`;
+      } catch (e) { $(prevId).innerHTML = `<span class="muted">อัปโหลดไม่สำเร็จ: ${esc(e.message)}</span>`; }
+    };
+    const clearEl = $(fileId.replace('File', 'Clear'));
+    if (clearEl) clearEl.onclick = () => {
+      $(hiddenId).value = '';
+      $(prevId).innerHTML = `<span class="muted">${emptyMsg}</span>`;
+      if (fileEl) fileEl.value = '';
+    };
   };
-  const gBannerClear = $('#gBannerClear');
-  if (gBannerClear) gBannerClear.onclick = () => {
-    $('#gBanner').value = '';
-    $('#gBannerPrev').innerHTML = '<span class="muted">ยังไม่มีรูป (ใช้กราฟิก LUCKY DRAW อัตโนมัติ)</span>';
-    if (gBannerFile) gBannerFile.value = '';
-  };
+  wireUpload('#gBannerFile', '#gBanner', '#gBannerPrev', 'ยังไม่มีรูป (ใช้กราฟิก LUCKY DRAW อัตโนมัติ)');
+  wireUpload('#gBgDFile', '#gBgD', '#gBgDPrev', 'เดสก์ท็อป (แนวนอน)', 54);
+  wireUpload('#gBgMFile', '#gBgM', '#gBgMPrev', 'มือถือ/iPad (แนวตั้ง)', 54);
   $('#gCopyLink').onclick = async () => {
     try { await navigator.clipboard.writeText($('#gLink').value); $('#gCopyLink').textContent = '✓ คัดลอกแล้ว'; }
     catch { $('#gLink').select(); }
@@ -278,6 +298,8 @@ async function renderGames(main) {
         name: $('#gName').value,
         displayName: $('#gDisplay').value,
         bannerUrl: $('#gBanner').value || '',
+        bgDesktopUrl: $('#gBgD').value || '',
+        bgMobileUrl: $('#gBgM').value || '',
         active: !!$('#gActive').value,
         limitPerDay: Number($('#gLimit').value) || 3,
         game: $('#gGame').value,

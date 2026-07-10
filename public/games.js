@@ -511,6 +511,7 @@ function setupEntryForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(ERRORS[data.error] || 'ลงทะเบียนไม่สำเร็จ ลองใหม่อีกครั้ง');
+      if (typeof data.remainingToday === 'number') state.campaign.remainingToday = data.remainingToday;
       showPlay();
     } catch (ex) {
       err.textContent = ex.message;
@@ -533,6 +534,15 @@ async function init() {
   }
   $('campaignName').textContent = state.campaign.name;
   applyTheme(state.campaign.theme);
+  // Full-page promo background: a wide image for landscape, a portrait one for
+  // tablet/phone. The image carries the branding, so the in-page banner+title
+  // are hidden (see .bgimg in games.css) and the game moves into the empty area.
+  if (state.campaign.bgDesktopUrl || state.campaign.bgMobileUrl) {
+    const root = document.documentElement.style;
+    root.setProperty('--bgd', `url("${state.campaign.bgDesktopUrl || state.campaign.bgMobileUrl}")`);
+    root.setProperty('--bgm', `url("${state.campaign.bgMobileUrl || state.campaign.bgDesktopUrl}")`);
+    document.body.classList.add('bgimg');
+  }
   // Custom PNG/JPG banner overrides the generated SVG when set in the admin.
   if (state.campaign.bannerUrl) {
     const img = document.createElement('img');

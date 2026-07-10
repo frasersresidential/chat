@@ -161,7 +161,8 @@ export function seedIfEmpty() {
     organizationId: O,
     name: 'ลุ้นโชคกับ Frasers Property',
     displayName: 'ลุ้นโชคกับ Frasers Property',
-    bannerUrl: '/banners/shock-price.webp',
+    bgDesktopUrl: '/banners/shock-bg-desktop.webp',
+    bgMobileUrl: '/banners/shock-bg-mobile.webp',
     active: true,
     game: 'wheel',
     limitPerDay: 3,
@@ -199,7 +200,8 @@ export function seedIfEmpty() {
     organizationId: O,
     name: `ลิงก์รางวัลใหญ่ ${th(amount)} บาท`,          // internal label (staff)
     displayName: 'ลุ้นโชคกับ Frasers Property',          // what the customer sees
-    bannerUrl: '/banners/shock-price.webp',
+    bgDesktopUrl: '/banners/shock-bg-desktop.webp',
+    bgMobileUrl: '/banners/shock-bg-mobile.webp',
     active: true,
     game: 'wheel',
     limitPerDay: 1,
