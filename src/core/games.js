@@ -172,7 +172,7 @@ export function enterGate({ campaign, playerId, name, phone, project, plot, code
   // Digits only — strip any dashes/spaces/symbols the client may have sent.
   const tel = String(phone || '').replace(/\D/g, '');
   if (!tel) return { error: 'missing_phone' };
-  if (tel.length < 9 || tel.length > 15) return { error: 'bad_phone' };
+  if (tel.length !== 10) return { error: 'bad_phone' };
   if (gate.enabled) {
     const want = String(gate.code || '').trim().toLowerCase();
     const got = String(code || '').trim().toLowerCase();

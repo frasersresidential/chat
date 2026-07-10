@@ -30,7 +30,7 @@ const ERRORS = {
   bad_code: 'รหัสไม่ถูกต้อง กรุณาตรวจสอบกับเจ้าหน้าที่',
   missing_name: 'กรุณากรอกชื่อ - นามสกุล',
   missing_phone: 'กรุณากรอกเบอร์โทรศัพท์',
-  bad_phone: 'กรุณากรอกเบอร์โทรให้ถูกต้อง (เฉพาะตัวเลข)',
+  bad_phone: 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก (ตัวเลขเท่านั้น)',
   phone_used: 'เบอร์นี้ใช้สิทธิ์ลุ้นรางวัลไปแล้ว ขอบคุณที่ร่วมสนุก 🙏',
   no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
@@ -489,17 +489,24 @@ function setupEntryForm() {
   // Phone: digits only — strip anything else as the user types.
   const phone = $('fPhone');
   if (phone) phone.addEventListener('input', () => {
-    const digits = phone.value.replace(/\D/g, '').slice(0, 15);
+    const digits = phone.value.replace(/\D/g, '').slice(0, 10);
     if (digits !== phone.value) phone.value = digits;
   });
   $('entryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('entryErr');
     err.classList.add('hidden');
+    // Phone must be exactly 10 digits.
+    const tel = $('fPhone').value.replace(/\D/g, '');
+    if (!/^[0-9]{10}$/.test(tel)) {
+      err.textContent = ERRORS.bad_phone;
+      err.classList.remove('hidden');
+      return;
+    }
     const payload = {
       playerId,
       name: $('fName').value.trim(),
-      phone: $('fPhone').value.trim(),
+      phone: tel,
       project: $('fProject').value.trim(),
       plot: $('fPlot').value.trim(),
       code: $('fCode').value.trim(),

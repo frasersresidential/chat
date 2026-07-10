@@ -27,7 +27,7 @@ test('public view never leaks weights or stock counts', () => {
 
 // The seeded campaign gates on a code, so register these players first.
 // Each player gets a distinct phone (one play per phone number is enforced).
-let phoneSeq = 700000000;
+let phoneSeq = 8100000000;
 const enter = (id, phone) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', phone: phone || String(phoneSeq++), project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
 
 test('a draw returns a prize from the pool and flavour matches the game', () => {
@@ -98,6 +98,9 @@ test('phone is stored as digits only and length-validated', () => {
   assert.equal(draw({ campaign: campaign(), playerId: 'fmt1', game: 'wheel' }).error, undefined);
   // too short after stripping symbols
   assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt2', name: 'ก', phone: '12-34', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
+  // must be EXACTLY 10 digits — 9 and 11 are both rejected
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt3', name: 'ก', phone: '081234567', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt4', name: 'ก', phone: '08123456789', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
 });
 
 test('finite stock decrements and empty pools stop paying out', () => {
