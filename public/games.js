@@ -31,6 +31,7 @@ const ERRORS = {
   missing_name: 'กรุณากรอกชื่อ - นามสกุล',
   missing_phone: 'กรุณากรอกเบอร์โทรศัพท์',
   bad_phone: 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก (ตัวเลขเท่านั้น)',
+  bad_project: 'กรุณาเลือกโครงการจากรายการที่กำหนด (พิมพ์เองไม่ได้)',
   phone_used: 'เบอร์นี้ใช้สิทธิ์ลุ้นรางวัลไปแล้ว ขอบคุณที่ร่วมสนุก 🙏',
   no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
@@ -503,11 +504,19 @@ function setupEntryForm() {
       err.classList.remove('hidden');
       return;
     }
+    // Project must be one of the picklist options — typed-only values are rejected.
+    const projects = state.campaign.gate?.projects || [];
+    const proj = $('fProject').value.trim();
+    if (projects.length && !projects.includes(proj)) {
+      err.textContent = ERRORS.bad_project;
+      err.classList.remove('hidden');
+      return;
+    }
     const payload = {
       playerId,
       name: $('fName').value.trim(),
       phone: tel,
-      project: $('fProject').value.trim(),
+      project: proj,
       plot: $('fPlot').value.trim(),
       code: $('fCode').value.trim(),
     };

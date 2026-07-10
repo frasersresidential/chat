@@ -179,6 +179,11 @@ export function enterGate({ campaign, playerId, name, phone, project, plot, code
     if (!want) return { error: 'no_code_configured' };
     if (got !== want) return { error: 'bad_code' };
   }
+  // Project must be picked from the configured list — free-typed values are rejected.
+  const projectList = Array.isArray(gate.projects) ? gate.projects : [];
+  if (projectList.length && !projectList.includes(String(project || '').trim())) {
+    return { error: 'bad_project' };
+  }
   // One play per phone: refuse registration once this number has already played.
   if (drawsByPhone(campaign.id, tel).length >= 1) return { error: 'phone_used' };
   const existing = db.gameEntries.find((e) => e.campaignId === campaign.id && e.playerId === playerId);
