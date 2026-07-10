@@ -452,11 +452,17 @@ body[data-pattern="dots"] {
    already carries the branding, so we hide the in-page banner + title and
    move the game into the empty area (right on desktop, bottom on portrait). */
 body.bgimg {
-  background: var(--bgm) top center / cover no-repeat fixed;
-  background-color: #f6c9dc;
+  /* contain = show the whole promo without zooming/cropping; the matching pink
+     fills the letterbox so it blends with the image's own background. */
+  background: var(--bgm) top center / contain no-repeat fixed;
+  background-color: #fdc5d1;
 }
 @media (min-aspect-ratio: 1/1) {
-  body.bgimg { background-image: var(--bgd); background-position: center; }
+  body.bgimg {
+    background-image: var(--bgd);
+    background-position: left center;
+    background-color: #fed0de;
+  }
 }
 body.bgimg .hero-banner,
 body.bgimg .hero h1,
