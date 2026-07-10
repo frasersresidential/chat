@@ -168,7 +168,8 @@ export function seedIfEmpty() {
     limitPerDay: 3,
     theme: {
       preset: 'frasers',
-      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
+      // Rim (accent) = deep pink; segments are set per-prize below.
+      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#c2185b', accent2: '#333f48', highlight: '#c9a557' },
       style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
     },
     // Entry gate: players fill the form and enter this code before playing.
@@ -180,13 +181,14 @@ export function seedIfEmpty() {
         'Grand Park วิภาวดี', 'Frasers Ville รังสิต', 'The Rich รัชดา',
       ],
     },
+    // 6 segments alternating white / light-pink, plus one red 100,000 prize.
     prizes: [
-      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 2, stock: 5, color: '#c9a557', couponPrefix: 'LUCKY500' },
-      { id: 'pz_100', label: 'ส่วนลด 100 บาท', win: true, weight: 10, stock: 50, color: '#da291c', couponPrefix: 'LUCKY100' },
-      { id: 'pz_50', label: 'ส่วนลด 50 บาท', win: true, weight: 20, stock: null, color: '#f6efe3', couponPrefix: 'LUCKY50' },
-      { id: 'pz_ship', label: 'ส่งฟรีทั่วไทย', win: true, weight: 20, stock: null, color: '#da291c', couponPrefix: 'FREESHIP' },
-      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 8, stock: 20, color: '#f6efe3', couponPrefix: 'GIFT' },
-      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 40, stock: null, color: '#97231c' },
+      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 18, stock: null, color: '#ffffff', couponPrefix: 'LUCKY500' },
+      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 14, stock: 20, color: '#f9c9dc', couponPrefix: 'GIFT' },
+      { id: 'pz_1000', label: 'ส่วนลด 1,000 บาท', win: true, weight: 8, stock: null, color: '#ffffff', couponPrefix: 'LUCKY1000' },
+      { id: 'pz_fee', label: 'ฟรีค่าธรรมเนียม', win: true, weight: 14, stock: null, color: '#f9c9dc', couponPrefix: 'FEEFREE' },
+      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 45, stock: null, color: '#ffffff' },
+      { id: 'pz_big', label: 'รางวัลใหญ่ 100,000 บาท', win: true, weight: 1, stock: 1, color: '#e30613', couponPrefix: 'BIG100K' },
     ],
   });
 
