@@ -371,7 +371,7 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     ? String(body.displayName).slice(0, 120) : (existing.displayName || '');
   // Optional custom banner image (uploaded PNG/JPG) shown atop the game page.
   const wantBanner = body.bannerUrl !== undefined ? body.bannerUrl : existing.bannerUrl;
-  const bannerUrl = typeof wantBanner === 'string' && /^(\/uploads\/|https?:\/\/|data:image\/)/.test(wantBanner)
+  const bannerUrl = typeof wantBanner === 'string' && /^(\/uploads\/|\/banners\/|https?:\/\/|data:image\/)/.test(wantBanner)
     ? wantBanner.slice(0, 500) : null;
   return {
     organizationId,
