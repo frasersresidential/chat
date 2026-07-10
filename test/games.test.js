@@ -27,7 +27,7 @@ test('public view never leaks weights or stock counts', () => {
 
 // The seeded campaign gates on a code, so register these players first.
 // Each player gets a distinct phone (one play per phone number is enforced).
-let phoneSeq = 700000000;
+let phoneSeq = 8100000000;
 const enter = (id, phone) => enterGate({ campaign: campaign(), playerId: id, name: 'ผู้เล่น', phone: phone || String(phoneSeq++), project: 'The Rich รัชดา', plot: 'A-1', code: 'FP2024' });
 
 test('a draw returns a prize from the pool and flavour matches the game', () => {
@@ -85,7 +85,7 @@ test('one play per phone number (any device)', () => {
   assert.equal(draw({ campaign: campaign(), playerId: 'ph1', game: 'wheel' }).error, 'phone_used');
   // ...even from a different device / playerId (re-registration is refused).
   assert.equal(
-    enterGate({ campaign: campaign(), playerId: 'ph1b', name: 'x', phone: '0899990001', project: 'p', plot: '1', code: 'FP2024' }).error,
+    enterGate({ campaign: campaign(), playerId: 'ph1b', name: 'x', phone: '0899990001', project: 'The Rich รัชดา', plot: '1', code: 'FP2024' }).error,
     'phone_used');
   // A different phone can still play.
   enter('ph2', '0899990002');
@@ -93,11 +93,23 @@ test('one play per phone number (any device)', () => {
 });
 
 test('phone is stored as digits only and length-validated', () => {
-  const ok = enterGate({ campaign: campaign(), playerId: 'fmt1', name: 'ก', phone: '081-234-5678', project: 'p', plot: '1', code: 'FP2024' });
+  const ok = enterGate({ campaign: campaign(), playerId: 'fmt1', name: 'ก', phone: '081-234-5678', project: 'The Rich รัชดา', plot: '1', code: 'FP2024' });
   assert.ok(ok.ok);
   assert.equal(draw({ campaign: campaign(), playerId: 'fmt1', game: 'wheel' }).error, undefined);
   // too short after stripping symbols
   assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt2', name: 'ก', phone: '12-34', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
+  // must be EXACTLY 10 digits — 9 and 11 are both rejected
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt3', name: 'ก', phone: '081234567', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
+  assert.equal(enterGate({ campaign: campaign(), playerId: 'fmt4', name: 'ก', phone: '08123456789', project: 'p', plot: '1', code: 'FP2024' }).error, 'bad_phone');
+});
+
+test('project must be chosen from the picklist — typed values are rejected', () => {
+  const base = { campaign: campaign(), name: 'ก', phone: '0898880001', plot: '1', code: 'FP2024' };
+  // A free-typed project not in the list is rejected...
+  assert.equal(enterGate({ ...base, playerId: 'pj1', project: 'โครงการที่พิมพ์เอง' }).error, 'bad_project');
+  assert.equal(enterGate({ ...base, playerId: 'pj2', project: '' }).error, 'bad_project');
+  // ...but an exact picklist option is accepted.
+  assert.ok(enterGate({ ...base, playerId: 'pj3', project: 'Neo Home บางนา' }).ok);
 });
 
 test('finite stock decrements and empty pools stop paying out', () => {

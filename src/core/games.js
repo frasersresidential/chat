@@ -141,6 +141,9 @@ export function publicCampaign(campaign) {
     active: campaign.active !== false,
     game: campaignGame(campaign),
     limitPerDay: campaign.limitPerDay ?? 3,
+    bannerUrl: campaign.bannerUrl || null,
+    bgDesktopUrl: campaign.bgDesktopUrl || null,
+    bgMobileUrl: campaign.bgMobileUrl || null,
     theme: sanitizeTheme(campaign.theme || {}, campaign.theme || {}),
     // gate.code is deliberately omitted — the entry form validates it server-side.
     gate: { enabled: !!gate.enabled, projects: gate.projects || [] },
@@ -169,12 +172,17 @@ export function enterGate({ campaign, playerId, name, phone, project, plot, code
   // Digits only — strip any dashes/spaces/symbols the client may have sent.
   const tel = String(phone || '').replace(/\D/g, '');
   if (!tel) return { error: 'missing_phone' };
-  if (tel.length < 9 || tel.length > 15) return { error: 'bad_phone' };
+  if (tel.length !== 10) return { error: 'bad_phone' };
   if (gate.enabled) {
     const want = String(gate.code || '').trim().toLowerCase();
     const got = String(code || '').trim().toLowerCase();
     if (!want) return { error: 'no_code_configured' };
     if (got !== want) return { error: 'bad_code' };
+  }
+  // Project must be picked from the configured list — free-typed values are rejected.
+  const projectList = Array.isArray(gate.projects) ? gate.projects : [];
+  if (projectList.length && !projectList.includes(String(project || '').trim())) {
+    return { error: 'bad_project' };
   }
   // One play per phone: refuse registration once this number has already played.
   if (drawsByPhone(campaign.id, tel).length >= 1) return { error: 'phone_used' };
@@ -188,7 +196,9 @@ export function enterGate({ campaign, playerId, name, phone, project, plot, code
   };
   if (existing) db.gameEntries.update(existing.id, data);
   else db.gameEntries.insert(data);
-  return { ok: true };
+  // Now that the phone is on record, report the real remaining plays (gated
+  // campaigns are one-per-phone) so the game screen shows the right count.
+  return { ok: true, remainingToday: remainingPlays(campaign, playerId) };
 }
 
 export function drawsToday(campaignId, playerId) {
@@ -368,6 +378,12 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
   // name = internal admin label; displayName = the headline customers see.
   const displayName = body.displayName !== undefined
     ? String(body.displayName).slice(0, 120) : (existing.displayName || '');
+  // Optional custom images: banner (atop the game) + full-page background
+  // images (a wide one for desktop, a portrait one for tablet/mobile).
+  const cleanImg = (want) => (typeof want === 'string' && /^(\/uploads\/|\/banners\/|https?:\/\/|data:image\/)/.test(want) ? want.slice(0, 500) : null);
+  const bannerUrl = cleanImg(body.bannerUrl !== undefined ? body.bannerUrl : existing.bannerUrl);
+  const bgDesktopUrl = cleanImg(body.bgDesktopUrl !== undefined ? body.bgDesktopUrl : existing.bgDesktopUrl);
+  const bgMobileUrl = cleanImg(body.bgMobileUrl !== undefined ? body.bgMobileUrl : existing.bgMobileUrl);
   return {
     organizationId,
     name: String(body.name || existing.name || 'Lucky Draw').slice(0, 120),
@@ -375,6 +391,9 @@ export function sanitizeCampaign(body, organizationId, existing = {}) {
     active: body.active === undefined ? existing.active !== false : !!body.active,
     game,
     limitPerDay: Math.max(1, Math.floor(Number(body.limitPerDay) || existing.limitPerDay || 3)),
+    bannerUrl,
+    bgDesktopUrl,
+    bgMobileUrl,
     theme: sanitizeTheme(body.theme || {}, existing.theme || {}),
     gate: sanitizeGate(body.gate, existing.gate),
     forcedPrizeId,

@@ -26,6 +26,27 @@ services:
       - key: VAPID_PRIVATE_KEY
         sync: false
 
+  # Gamification Studio — the lucky-draw games + reports, deployed as its own
+  # service (separate from the OmniChat inbox). It shares the same Postgres DB
+  # and the same login accounts, but serves only /games.html + /api/games/*.
+  - type: web
+    name: omnichat-studio
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: npm run start:studio
+    healthCheckPath: /healthz
+    envVars:
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DEMO_PASSWORD
+        sync: false
+      - key: DATABASE_URL          # same DB as the inbox → shared game data
+        fromDatabase:
+          name: omnichat-db
+          property: connectionString
+
 databases:
   - name: omnichat-db
     plan: free                     # free Postgres (note: free DBs expire after ~90 days)

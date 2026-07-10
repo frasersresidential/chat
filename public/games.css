@@ -43,6 +43,7 @@ body[data-pattern="dots"] {
 .hero { text-align: center; margin-bottom: 18px; }
 .hero-banner { width: min(88vw, 340px); margin: 0 auto 6px; }
 .hero-banner svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 6px 12px rgba(20,18,30,.16)); }
+.banner-img { width: 100%; height: auto; display: block; border-radius: 12px; filter: drop-shadow(0 6px 14px rgba(20,18,30,.18)); }
 .overline {
   display: inline-block; padding: 6px 18px; margin-bottom: 14px;
   background: var(--accent); color: var(--on-accent); border: var(--bd); border-radius: 999px;
@@ -444,4 +445,41 @@ body[data-pattern="dots"] {
   .wheel-wrap { width: min(70vh, 720px); }
   .hub { width: 138px; height: 138px; }
   .hub span { font-size: 30px; }
+}
+
+/* ── Full-page promo background (responsive) ───────────────────────────────
+   Set by games.js when the campaign has bgDesktopUrl / bgMobileUrl. The image
+   already carries the branding, so we hide the in-page banner + title and
+   move the game into the empty area (right on desktop, bottom on portrait). */
+body.bgimg {
+  /* contain = show the whole promo without zooming/cropping; the matching pink
+     fills the letterbox so it blends with the image's own background. */
+  background: var(--bgm) top center / contain no-repeat fixed;
+  background-color: #fdc5d1;
+}
+@media (min-aspect-ratio: 1/1) {
+  body.bgimg {
+    background-image: var(--bgd);
+    background-position: left center;
+    background-color: #fed0de;
+  }
+}
+body.bgimg .hero-banner,
+body.bgimg .hero h1,
+body.bgimg .hairline { display: none; }
+body.bgimg .hero { margin: 0 0 10px; }
+
+/* portrait (tablet / phone): kiosk is up top → push the game to the lower pink area */
+@media (max-aspect-ratio: 1/1) {
+  body.bgimg #app { min-height: 100vh; justify-content: flex-end; padding-top: 52vh; }
+}
+/* landscape (desktop / tablet): kiosk is on the left → move the game to the right
+   pink area. Force a single column so the split-kiosk grid above doesn't apply. */
+@media (min-aspect-ratio: 1/1) {
+  body.bgimg #app {
+    display: flex; flex-direction: column; justify-content: center;
+    margin-left: auto; margin-right: max(6vw, 40px);
+    max-width: 440px; padding: 28px 20px;
+  }
+  body.bgimg .hero { text-align: center; margin: 0 0 12px; }
 }

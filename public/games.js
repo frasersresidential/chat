@@ -30,7 +30,8 @@ const ERRORS = {
   bad_code: 'รหัสไม่ถูกต้อง กรุณาตรวจสอบกับเจ้าหน้าที่',
   missing_name: 'กรุณากรอกชื่อ - นามสกุล',
   missing_phone: 'กรุณากรอกเบอร์โทรศัพท์',
-  bad_phone: 'กรุณากรอกเบอร์โทรให้ถูกต้อง (เฉพาะตัวเลข)',
+  bad_phone: 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก (ตัวเลขเท่านั้น)',
+  bad_project: 'กรุณาเลือกโครงการจากรายการที่กำหนด (พิมพ์เองไม่ได้)',
   phone_used: 'เบอร์นี้ใช้สิทธิ์ลุ้นรางวัลไปแล้ว ขอบคุณที่ร่วมสนุก 🙏',
   no_code_configured: 'ยังไม่ได้ตั้งรหัสสำหรับกิจกรรมนี้',
 };
@@ -421,8 +422,27 @@ function showResult(result) {
     catch { toast('คัดลอกไม่สำเร็จ กรุณาแคปหน้าจอแทนค่ะ'); }
   });
 
-  $('againBtn').textContent = result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด';
+  // Gated = one spin per registration: send the player back to the form for the
+  // next person. Ungated campaigns keep the repeat-play behaviour.
+  $('againBtn').textContent = state.campaign?.gate?.enabled
+    ? 'เริ่มรอบใหม่ · ลงทะเบียนคนถัดไป'
+    : (result.remainingToday > 0 ? 'เล่นอีกครั้ง' : 'ปิด');
   $('modal').classList.remove('hidden');
+}
+
+// Reset the form and return to the registration screen for the next player.
+// The device keeps its player id; the server still blocks any phone that has
+// already played (one phone = one spin), so the next round needs a new number.
+function startNewRound() {
+  for (const id of ['fName', 'fPhone', 'fProject', 'fPlot', 'fCode']) {
+    const el = $(id);
+    if (el) el.value = '';
+  }
+  $('entryErr').classList.add('hidden');
+  $('projList').classList.add('hidden');
+  if (state.campaign) state.campaign.entered = false;
+  $('entryNext').disabled = false;
+  showEntry();
 }
 
 /* ── หน้าแรก: ฟอร์มลงทะเบียน + ค้นหาโครงการ ────────────────────────────────── */
@@ -470,18 +490,33 @@ function setupEntryForm() {
   // Phone: digits only — strip anything else as the user types.
   const phone = $('fPhone');
   if (phone) phone.addEventListener('input', () => {
-    const digits = phone.value.replace(/\D/g, '').slice(0, 15);
+    const digits = phone.value.replace(/\D/g, '').slice(0, 10);
     if (digits !== phone.value) phone.value = digits;
   });
   $('entryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('entryErr');
     err.classList.add('hidden');
+    // Phone must be exactly 10 digits.
+    const tel = $('fPhone').value.replace(/\D/g, '');
+    if (!/^[0-9]{10}$/.test(tel)) {
+      err.textContent = ERRORS.bad_phone;
+      err.classList.remove('hidden');
+      return;
+    }
+    // Project must be one of the picklist options — typed-only values are rejected.
+    const projects = state.campaign.gate?.projects || [];
+    const proj = $('fProject').value.trim();
+    if (projects.length && !projects.includes(proj)) {
+      err.textContent = ERRORS.bad_project;
+      err.classList.remove('hidden');
+      return;
+    }
     const payload = {
       playerId,
       name: $('fName').value.trim(),
-      phone: $('fPhone').value.trim(),
-      project: $('fProject').value.trim(),
+      phone: tel,
+      project: proj,
       plot: $('fPlot').value.trim(),
       code: $('fCode').value.trim(),
     };
@@ -492,6 +527,7 @@ function setupEntryForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(ERRORS[data.error] || 'ลงทะเบียนไม่สำเร็จ ลองใหม่อีกครั้ง');
+      if (typeof data.remainingToday === 'number') state.campaign.remainingToday = data.remainingToday;
       showPlay();
     } catch (ex) {
       err.textContent = ex.message;
@@ -514,6 +550,24 @@ async function init() {
   }
   $('campaignName').textContent = state.campaign.name;
   applyTheme(state.campaign.theme);
+  // Full-page promo background: a wide image for landscape, a portrait one for
+  // tablet/phone. The image carries the branding, so the in-page banner+title
+  // are hidden (see .bgimg in games.css) and the game moves into the empty area.
+  if (state.campaign.bgDesktopUrl || state.campaign.bgMobileUrl) {
+    const root = document.documentElement.style;
+    root.setProperty('--bgd', `url("${state.campaign.bgDesktopUrl || state.campaign.bgMobileUrl}")`);
+    root.setProperty('--bgm', `url("${state.campaign.bgMobileUrl || state.campaign.bgDesktopUrl}")`);
+    document.body.classList.add('bgimg');
+  }
+  // Custom PNG/JPG banner overrides the generated SVG when set in the admin.
+  if (state.campaign.bannerUrl) {
+    const img = document.createElement('img');
+    img.className = 'banner-img';
+    img.src = state.campaign.bannerUrl;
+    img.alt = state.campaign.name || 'campaign banner';
+    const box = $('heroBanner');
+    if (box) { box.innerHTML = ''; box.appendChild(img); }
+  }
 
   // One game per link — the admin picks it; the customer just plays it.
   const game = state.campaign.game || 'wheel';
@@ -528,6 +582,9 @@ async function init() {
   $('againBtn').addEventListener('click', () => {
     $('modal').classList.add('hidden');
     $('cylinder').classList.remove('revealed');
+    // 1 form = 1 play: gated campaigns return to the registration form so the
+    // next person must register again (and one phone can play only once).
+    if (state.campaign?.gate?.enabled) startNewRound();
   });
 
   // Gate: registered players (or gate-off campaigns) skip straight to the game.
