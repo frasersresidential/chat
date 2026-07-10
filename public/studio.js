@@ -294,10 +294,13 @@ async function renderGames(main) {
         },
         prizes,
       }) });
-      $('#gSaveMsg').textContent = '✓ บันทึกแล้ว — เปิดหน้าเกมเพื่อดูผล';
-      setTimeout(() => renderGames(main), 700);
+      // Flash survives the re-render below so the confirmation stays visible.
+      state.flash = '✓ บันทึกแล้ว — กด “เปิดหน้าเกม ↗” เพื่อดูผลบนหน้าเกม';
+      renderGames(main);
     } catch (e) { alert(e.message); }
   };
+
+  if (state.flash) { const m = $('#gSaveMsg'); if (m) m.textContent = state.flash; state.flash = null; }
 }
 
 function gamePrizeRow(p, i, manage) {
