@@ -39,8 +39,11 @@
 
         <label class="field combo" id="projField">
           <span>โครงการ</span>
-          <input id="fProject" type="text" placeholder="พิมพ์เพื่อค้นหา แล้วเลือกโครงการ" autocomplete="off" required />
-          <div id="projList" class="combo-list hidden"></div>
+          <input id="fProject" type="text" readonly placeholder="แตะเพื่อเลือกโครงการ" autocomplete="off" required />
+          <div id="projList" class="combo-list hidden">
+            <input id="projSearch" class="combo-search" type="text" placeholder="ค้นหาโครงการ…" autocomplete="off" />
+            <div id="projOptions"></div>
+          </div>
         </label>
 
         <label class="field">

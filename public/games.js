@@ -446,29 +446,32 @@ function startNewRound() {
 }
 
 /* ── หน้าแรก: ฟอร์มลงทะเบียน + ค้นหาโครงการ ────────────────────────────────── */
+// Project is SELECT-ONLY: the field itself is read-only (no free typing); the
+// user taps it to open a dropdown, optionally searches inside it, and picks an
+// option. The value can therefore only ever be one of the configured projects.
 function setupProjectCombo(projects) {
   const input = $('fProject');
   const list = $('projList');
-  const render = (items) => {
-    if (!items.length) { list.classList.add('hidden'); return; }
-    list.innerHTML = items.map((p) => `<button type="button" class="combo-opt">${p.replace(/</g, '&lt;')}</button>`).join('');
-    list.classList.remove('hidden');
+  const search = $('projSearch');
+  const optbox = $('projOptions');
+  const field = $('projField');
+  const render = (q = '') => {
+    const items = projects.filter((p) => p.toLowerCase().includes(q.trim().toLowerCase()));
+    optbox.innerHTML = items.length
+      ? items.map((p) => `<button type="button" class="combo-opt">${p.replace(/</g, '&lt;')}</button>`).join('')
+      : '<div class="combo-empty">ไม่พบโครงการที่ค้นหา</div>';
   };
-  const filter = () => {
-    const q = input.value.trim().toLowerCase();
-    render(projects.filter((p) => p.toLowerCase().includes(q)).slice(0, 40));
-  };
-  input.addEventListener('focus', filter);
-  input.addEventListener('input', filter);
-  list.addEventListener('click', (e) => {
+  const open = () => { search.value = ''; render(); list.classList.remove('hidden'); search.focus(); };
+  const close = () => list.classList.add('hidden');
+  input.addEventListener('click', () => (list.classList.contains('hidden') ? open() : close()));
+  search.addEventListener('input', () => render(search.value));
+  optbox.addEventListener('click', (e) => {
     const opt = e.target.closest('.combo-opt');
     if (!opt) return;
     input.value = opt.textContent;
-    list.classList.add('hidden');
+    close();
   });
-  document.addEventListener('click', (e) => {
-    if (!$('projField').contains(e.target)) list.classList.add('hidden');
-  });
+  document.addEventListener('click', (e) => { if (!field.contains(e.target)) close(); });
 }
 
 function showEntry() {
