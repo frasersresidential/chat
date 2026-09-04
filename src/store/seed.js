@@ -4,6 +4,7 @@ import { hashPassword } from '../core/auth.js';
 import { defaultBusinessHours } from '../core/businessHours.js';
 import { defaultDailyReport } from '../core/dailyReport.js';
 import { defaultSla } from '../core/sla.js';
+import { defaultAdsPolicy } from '../ads/optimizer.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
@@ -20,7 +21,7 @@ export function seedIfEmpty() {
   if (!db.isEmpty()) return;
   log.info('seeding demo organization "Company A"...');
 
-  const org = db.organizations.insert({ id: 'org_company_a', name: 'Company A', businessHours: defaultBusinessHours(), dailyReport: defaultDailyReport(), sla: defaultSla() });
+  const org = db.organizations.insert({ id: 'org_company_a', name: 'Company A', businessHours: defaultBusinessHours(), dailyReport: defaultDailyReport(), sla: defaultSla(), adsPolicy: defaultAdsPolicy() });
   const O = org.id;
 
   // ── Teams (hierarchy) ─────────────────────────────────────────────────────
@@ -154,6 +155,19 @@ export function seedIfEmpty() {
     db.projects.insert({ id, organizationId: O, name, code: keywords[0], keywords, teamId });
   project('proj_rym', 'Rhythm (RYM)', ['RYM', 'Rhythm', 'ริทึ่ม'], projRym.id);
   project('proj_lpn', 'Lumpini (LPN)', ['LPN', 'Lumpini', 'ลุมพินี'], projLpn.id);
+
+  // ── AI ads optimization — demo ad accounts ───────────────────────────────
+  // No credentials → the delivery simulator generates a realistic portfolio
+  // (campaigns per project → ad sets → ads) so the AI optimizer has something
+  // to work on out of the box. Connect real accounts in the Ads AI tab.
+  db.adAccounts.insert({
+    id: 'adacc_meta_demo', organizationId: O, platform: 'meta',
+    name: 'Meta Ads — Company A', credential: {}, status: 'active', currency: 'THB',
+  });
+  db.adAccounts.insert({
+    id: 'adacc_google_demo', organizationId: O, platform: 'google',
+    name: 'Google Ads — Company A', credential: {}, status: 'active', currency: 'THB',
+  });
 
   // ── Auto-replies / chatbot ───────────────────────────────────────────────
   const auto = (type, text, keywords = []) =>

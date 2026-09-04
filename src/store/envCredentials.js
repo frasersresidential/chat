@@ -31,4 +31,18 @@ export function applyEnvCredentials() {
     });
     log.info(`applied .env credentials to ${account.accountName}`);
   }
+
+  // Same bridge for ad accounts (Meta Marketing API / Google Ads API).
+  const adsMap = [
+    ['meta', { accessToken: config.ads.meta.accessToken, adAccountId: config.ads.meta.adAccountId }],
+    ['google', config.ads.google],
+  ];
+  for (const [platform, cred] of adsMap) {
+    const clean = Object.fromEntries(Object.entries(cred).filter(([, v]) => v));
+    if (!Object.keys(clean).length) continue;
+    const account = db.adAccounts.find((a) => a.platform === platform);
+    if (!account) continue;
+    db.adAccounts.update(account.id, { credential: { ...account.credential, ...clean } });
+    log.info(`applied .env ads credentials to ${account.name}`);
+  }
 }

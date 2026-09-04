@@ -41,6 +41,7 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Tags & grading** | Free-form tags + A–F lead grade per conversation; full-text search across chats. |
 | **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
+| **🤖 AI Ads Optimization** | Real-time AI optimizer for **Meta Ads + Google Ads**: syncs campaigns/ad sets/ads every cycle, pauses budget-burners, scales winners' budgets, tunes bids, kills A/B losing creatives, dayparting, anomaly alerts — with guardrails (caps, floors, cooldowns), auto vs approval mode, live action feed, and a **Claude-powered strategy advisor**. Runs on a realistic delivery simulator with zero credentials. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
 | **PWA** | Installable, mobile-first; sound + desktop + **Web Push** notifications (reach the phone with the app closed). |
@@ -101,10 +102,12 @@ npm run dev  # auto-reload
 src/
   channels/      adapters: base, meta(messenger/instagram), whatsapp, line, x, tiktok, mock, registry
   core/          rbac, presence, teams, routing, conversations, notifications, eventBus
+  ads/           AI ads optimization: providers (Meta/Google), simulator, metrics engine,
+                 optimizer (decision rules + guardrails), Claude advisor
   store/         db (JSON document store), seed, envCredentials
-  server/        app (REST), webhooks, realtime (WebSocket)
+  server/        app (REST), adsApi, webhooks, realtime (WebSocket)
 public/          zero-build SPA agent console + admin UI
-test/            routing & RBAC tests
+test/            routing / RBAC / ads-optimizer tests
 ```
 
 The storage layer (`src/store/db.js`) is a zero-dependency JSON document store
@@ -155,7 +158,7 @@ LINE `X-Line-Signature`, X CRC/`X-Twitter-Webhooks-Signature`, TikTok HMAC).
 
 `organizations, users, teams, team_members, channel_accounts, routing_rules,
 conversations, messages, conversation_assignments (round_robin|manual|ai|transfer),
-notifications`.
+notifications, ad_accounts, ad_entities (campaign|adset|ad), ad_metrics, ad_actions`.
 
 ## 🔑 API (selected)
 
@@ -171,4 +174,29 @@ GET  /api/conversations/:id
 POST /api/conversations/:id/reply · /assign · /transfer · /takeover · /read
 GET  /api/notifications
 WS   /ws?userId=...
+
+# 🤖 AI Ads Optimization
+GET  /api/ads/overview · /entities · /actions · /policy
+POST /api/ads/accounts · PUT/DELETE /api/ads/accounts/:id
+POST /api/ads/entities/:id/action   (pause|resume|budget|bid — manual control)
+PUT  /api/ads/entities/:id          (aiExcluded — opt an entity out of AI)
+POST /api/ads/actions/:id/approve · /reject   (suggest-mode queue)
+PUT  /api/ads/policy · POST /api/ads/run · POST /api/ads/analyze (Claude)
 ```
+
+## 🤖 AI Ads Optimization — how it works
+
+The optimizer loop (`src/ads/optimizer.js`) runs every `intervalSec` (60 s
+default): **sync** fresh structure + insights from each connected platform
+(Meta Marketing API / Google Ads API — or a realistic delivery simulator when
+no credentials are set), **decide** using guarded rules (pause CPA-blowers &
+zero-conversion burners, scale winning budgets up / losers down within
+`maxBudgetChangePct`, floor & cap, tune manual bids toward target CPA, pause
+A/B losing creatives, dayparting, anomaly alerts for overspend pacing / CTR
+collapse / zero delivery), then **act** — applied instantly in `auto` mode or
+queued for human approval in `suggest` mode. Every action carries a Thai
+explanation, lands in the audit log, and streams live to the dashboard over
+WebSocket. `POST /api/ads/analyze` sends a portfolio snapshot to **Claude**
+(`ANTHROPIC_API_KEY`) for a deeper strategic read; its proposals join the same
+approval queue. Targets and guardrails are editable per-org in the **Ads AI**
+tab.

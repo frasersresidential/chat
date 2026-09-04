@@ -16,6 +16,26 @@ export const config = {
   // Default password seeded users get, so the demo is loginable out of the box.
   demoPassword: process.env.DEMO_PASSWORD || 'demo1234',
 
+  // AI ads optimization (Meta / Google). Accounts with no credentials run in
+  // simulated mode; ANTHROPIC_API_KEY unlocks the Claude strategy advisor.
+  ads: {
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-opus-5',
+    googleApiVersion: process.env.GOOGLE_ADS_API_VERSION || 'v21',
+    meta: {
+      accessToken: process.env.META_ADS_ACCESS_TOKEN || '',
+      adAccountId: process.env.META_ADS_ACCOUNT_ID || '',
+    },
+    google: {
+      developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '',
+      clientId: process.env.GOOGLE_ADS_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET || '',
+      refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN || '',
+      customerId: process.env.GOOGLE_ADS_CUSTOMER_ID || '',
+      loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '',
+    },
+  },
+
   channels: {
     messenger: {
       pageAccessToken: process.env.MESSENGER_PAGE_ACCESS_TOKEN || '',

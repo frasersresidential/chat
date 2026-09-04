@@ -32,6 +32,11 @@ const EMPTY = () => ({
   projects: {},
   reminders: {},
   pushSubscriptions: {},
+  // AI ads optimization (Meta / Google)
+  adAccounts: {},
+  adEntities: {},
+  adMetrics: {},
+  adActions: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -113,6 +118,10 @@ export const db = {
   projects: collection('projects'),
   reminders: collection('reminders'),
   pushSubscriptions: collection('pushSubscriptions'),
+  adAccounts: collection('adAccounts'),
+  adEntities: collection('adEntities'),
+  adMetrics: collection('adMetrics'),
+  adActions: collection('adActions'),
 
   /**
    * Load persisted data. When DATABASE_URL is set, hydrate from Postgres and

@@ -15,6 +15,7 @@ export const PERMISSIONS = {
   MANAGE_TEAMS: 'manage_teams',
   MANAGE_ROUTING: 'manage_routing',
   MANAGE_AUTOMATION: 'manage_automation',
+  MANAGE_ADS: 'manage_ads',
   VIEW_ALL_CONVERSATIONS: 'view_all_conversations',
   VIEW_TEAM_CONVERSATIONS: 'view_team_conversations',
   VIEW_ANALYTICS: 'view_analytics',
@@ -37,7 +38,7 @@ export const ROLES = {
     eligibleForAssignment: false,
     permissions: [
       P.MANAGE_USERS, P.MANAGE_CHANNELS, P.MANAGE_TEAMS, P.MANAGE_ROUTING,
-      P.MANAGE_AUTOMATION, P.VIEW_ALL_CONVERSATIONS, P.VIEW_ANALYTICS,
+      P.MANAGE_AUTOMATION, P.MANAGE_ADS, P.VIEW_ALL_CONVERSATIONS, P.VIEW_ANALYTICS,
       P.REPLY, P.ASSIGN, P.TAKEOVER, P.TRANSFER,
     ],
   },
