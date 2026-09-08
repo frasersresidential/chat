@@ -19,6 +19,7 @@ import { defaultSla } from '../core/sla.js';
 import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
+import { createAdsRouter } from './adsApi.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
 
@@ -591,6 +592,9 @@ export function createApp() {
   // ── Notifications ─────────────────────────────────────────────────────────
   api.get('/notifications', (req, res) => res.json(listNotifications(req.user.id)));
   api.post('/notifications/:id/read', (req, res) => res.json(markNotifRead(req.params.id)));
+
+  // ── AI ads optimization (Meta / Google) ───────────────────────────────────
+  api.use('/ads', createAdsRouter());
 
   app.use('/api', api);
 

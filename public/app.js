@@ -198,6 +198,9 @@ function connectWs() {
           (msg.conversationId !== state.selectedId || document.hidden)) {
         notifyInbound(msg.message);
       }
+    } else if (msg.type === 'ads:action' || msg.type === 'ads:tick') {
+      if (msg.type === 'ads:action') flashAdsAction(msg.action);
+      scheduleAdsRefresh();
     } else if (msg.type === 'typing') {
       if (msg.conversationId === state.selectedId && msg.user.id !== state.user.id && msg.isTyping) showTyping(msg.user.name);
     } else if (msg.type === 'notification:created') {
@@ -290,6 +293,7 @@ function notifyInbound(message) {
 // ── Router ────────────────────────────────────────────────────────────────────
 function render() {
   const main = $('#main');
+  if (state.view === 'ads') return renderAds(main);
   if (state.view === 'inbox') return renderInbox(main);
   if (state.view === 'tasks') return renderTasks(main);
   if (state.view === 'pipeline') return renderPipeline(main);
@@ -1424,6 +1428,385 @@ async function renderReports(main) {
 }
 function gradeColor(g) {
   return { A: '#2ea043', B: '#3fb950', C: '#d29922', D: '#db8b00', E: '#da7633', F: '#da3633', ungraded: '#8b949e' }[g] || 'var(--accent)';
+}
+
+// ── Ads AI — real-time auto optimization (Meta / Google) ─────────────────────────
+let adsData = null;          // last /ads/overview payload
+let adsRefreshTimer = null;  // throttle for live WS-driven refreshes
+
+const canSeeAds = () => can('view_analytics') || can('manage_ads');
+const fmtN = (n) => Number(n ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+const fmtB = (n) => n == null ? '—' : '฿' + Number(n).toLocaleString('th-TH', { maximumFractionDigits: n < 100 ? 2 : 0 });
+const AD_LEVEL_ICON = { campaign: '📁', adset: '🎯', ad: '🖼️' };
+const AD_CRED_FIELDS = {
+  meta: [['accessToken', 'Access Token (ads_read + ads_management)'], ['adAccountId', 'Ad Account ID (act_…)']],
+  google: [['developerToken', 'Developer Token'], ['clientId', 'OAuth Client ID'], ['clientSecret', 'OAuth Client Secret'],
+    ['refreshToken', 'Refresh Token'], ['customerId', 'Customer ID'], ['loginCustomerId', 'Login Customer ID (MCC, ไม่บังคับ)']],
+};
+
+// WS events → refresh the dashboard (throttled) + keep the nav badge fresh.
+function scheduleAdsRefresh() {
+  if (state.view !== 'ads' || adsRefreshTimer) return;
+  adsRefreshTimer = setTimeout(async () => {
+    adsRefreshTimer = null;
+    if (state.view !== 'ads') return;
+    try { await loadAdsOverview(); renderAdsDynamic(); } catch { /* keep old view */ }
+  }, 900);
+}
+function flashAdsAction(action) {
+  if (!action || action.status !== 'suggested') return;
+  const b = $('#adsBadge');
+  if (b) { b.textContent = Number(b.textContent || 0) + 1; b.classList.remove('hidden'); }
+}
+function updateAdsBadge() {
+  const b = $('#adsBadge');
+  if (!b || !adsData) return;
+  b.textContent = adsData.pendingSuggestions;
+  b.classList.toggle('hidden', !adsData.pendingSuggestions);
+}
+
+async function loadAdsOverview() {
+  adsData = await api('/ads/overview');
+  updateAdsBadge();
+  return adsData;
+}
+
+async function renderAds(main) {
+  if (!canSeeAds()) {
+    main.innerHTML = '<div class="admin"><h2>🤖 Ads AI</h2><p class="muted">ต้องมีสิทธิ์ View Analytics (Owner / Admin / Manager)</p></div>';
+    return;
+  }
+  main.innerHTML = '<div class="admin"><p class="muted">กำลังโหลดข้อมูลโฆษณา…</p></div>';
+  try { await loadAdsOverview(); } catch (e) {
+    main.innerHTML = `<div class="admin"><h2>🤖 Ads AI</h2><p class="muted">โหลดไม่สำเร็จ: ${esc(e.message)}</p></div>`;
+    return;
+  }
+  const manage = adsData.canManage;
+  main.innerHTML = `<div class="admin">
+    <div class="report-toolbar">
+      <h2 style="margin:0">🤖 Ads AI — Auto Optimization</h2>
+      <div class="report-actions" style="align-items:center">
+        <span class="ads-live"><span class="pulse"></span>เรียลไทม์ ทุก ${adsData.policy.intervalSec} วิ</span>
+        <span class="mode-pill ${adsData.policy.mode === 'auto' ? 'mode-auto' : 'mode-suggest'}" id="adsModePill">${adsData.policy.mode === 'auto' ? '⚡ AUTO — AI ปรับให้เอง' : '✋ SUGGEST — รออนุมัติ'}</span>
+        ${manage ? '<button class="btn ghost" id="adsRunBtn">⚡ Run AI ตอนนี้</button>' : ''}
+        ${manage ? `<button class="btn" id="adsAnalyzeBtn">🧠 วิเคราะห์ด้วย Claude${adsData.ai.claude ? '' : ' (พื้นฐาน)'}</button>` : ''}
+      </div>
+    </div>
+    <div id="adsStats" class="stat-grid"></div>
+    <div class="report-cols">
+      <div class="card"><h3 style="margin-top:0">💸 การใช้งบรายชั่วโมง (12 ชม.)</h3><div id="adsSeries"></div></div>
+      <div class="card"><h3 style="margin-top:0">🤖 AI Live Feed — สิ่งที่ AI ทำให้</h3><div id="adsFeed" class="ads-feed"></div></div>
+    </div>
+    <div id="adsQueue"></div>
+    <div id="adsAiPanel"></div>
+    <div class="card"><h3 style="margin-top:0">📦 Campaigns → Ad sets → Ads (วันนี้)</h3><div id="adsEntities" style="overflow-x:auto"></div></div>
+    <div id="adsPolicyCard"></div>
+    <div id="adsAccountsCard"></div>
+  </div>`;
+  renderAdsDynamic();
+  renderAdsPolicy();
+  renderAdsAccounts();
+  if ($('#adsRunBtn')) $('#adsRunBtn').onclick = async () => {
+    const btn = $('#adsRunBtn'); btn.disabled = true; btn.textContent = '⏳ กำลังรัน…';
+    try { await api('/ads/run', { method: 'POST' }); await loadAdsOverview(); renderAdsDynamic(); }
+    catch (e) { alert(e.message); }
+    btn.disabled = false; btn.textContent = '⚡ Run AI ตอนนี้';
+  };
+  if ($('#adsAnalyzeBtn')) $('#adsAnalyzeBtn').onclick = runAdsAnalysis;
+}
+
+/** Re-render only the live sections (stats, chart, feed, queue, table). */
+function renderAdsDynamic() {
+  if (!adsData || !$('#adsStats')) return;
+  const t = adsData.totals;
+  const policy = adsData.policy;
+  const stat = (label, value, sub = '') =>
+    `<div class="stat"><div class="stat-v">${value}</div><div class="stat-l">${label}</div>${sub ? `<div class="muted" style="font-size:11px">${sub}</div>` : ''}</div>`;
+  $('#adsStats').innerHTML =
+    stat('ใช้งบวันนี้', fmtB(t.spend)) +
+    stat('Impressions', fmtN(t.imp)) +
+    stat('Clicks', fmtN(t.clk), `CTR ${t.ctr}%`) +
+    stat('Leads', fmtN(t.conv)) +
+    stat('CPA', t.cpa != null ? fmtB(t.cpa) : '—', `เป้า ≤ ${fmtB(policy.targetCpa)}`) +
+    stat('ROAS', t.roas != null ? t.roas + 'x' : '—', `เป้า ≥ ${policy.targetRoas}x`) +
+    stat('มูลค่า Conversion', fmtB(t.rev)) +
+    stat('รออนุมัติ', adsData.pendingSuggestions, policy.mode === 'suggest' ? 'โหมด suggest' : '');
+
+  // Hourly spend chart (bucket timestamps → viewer's local time).
+  const maxSpend = Math.max(1, ...adsData.series.map((b) => b.spend));
+  $('#adsSeries').innerHTML = adsData.series.map((b) =>
+    `<div class="barrow"><span class="barlbl">${new Date(b.t).getHours()}:00</span>
+      <span class="bartrack"><span class="barfill" style="width:${(b.spend / maxSpend) * 100}%;background:#7c5cff"></span></span>
+      <span class="barval" style="width:70px">${fmtB(b.spend)}</span></div>`).join('') || '<p class="muted">ยังไม่มีข้อมูล</p>';
+
+  // Live action feed.
+  const KIND_LABEL = { pause: '⏸ หยุดแอด', resume: '▶ เปิดแอด', budget: '💰 ปรับงบ', bid: '🎯 ปรับ bid', alert: '🚨 แจ้งเตือน', rotate: '🔁 หมุนครีเอทีฟ' };
+  const STATUS_LABEL = { applied: 'ทำแล้ว', suggested: 'รออนุมัติ', rejected: 'ปฏิเสธ', failed: 'ล้มเหลว' };
+  $('#adsFeed').innerHTML = adsData.actions.length ? adsData.actions.map((a) => `
+    <div class="ads-evt ${a.severity || 'info'}">
+      <div class="t">${(adsData.platforms[a.platform] || {}).icon || ''} ${KIND_LABEL[a.kind] || a.kind}
+        <span class="nm">${esc(a.entityName)}</span>
+        ${a.kind === 'budget' && a.from != null ? `<span class="muted">${fmtB(a.from)} → ${fmtB(a.to)}</span>` : ''}
+        <span class="ads-badge ${a.status}">${STATUS_LABEL[a.status] || a.status}</span>
+        <span class="muted" style="margin-left:auto;font-weight:400">${timeAgo(a.createdAt)}</span>
+      </div>
+      <div class="r">${esc(a.reason)}${a.error ? ` · ✕ ${esc(a.error)}` : ''}</div>
+    </div>`).join('') : '<p class="muted">AI ยังไม่มี action — รอรอบถัดไป หรือกด Run AI ตอนนี้</p>';
+
+  renderAdsQueue();
+  renderAdsEntities();
+}
+
+function renderAdsQueue() {
+  const box = $('#adsQueue');
+  if (!box) return;
+  const pending = adsData.actions.filter((a) => a.status === 'suggested');
+  if (!pending.length) { box.innerHTML = ''; return; }
+  const manage = adsData.canManage;
+  box.innerHTML = `<div class="card" style="border-color:#7a6320">
+    <h3 style="margin-top:0">✋ รออนุมัติ (${pending.length}) — AI เสนอให้ปรับ</h3>
+    ${pending.map((a) => `
+      <div class="ads-evt ${a.severity || 'info'}" style="margin-bottom:8px">
+        <div class="t">${(adsData.platforms[a.platform] || {}).icon || ''} ${esc(a.entityName)}
+          <span class="muted">· ${a.kind}${a.from != null ? ` ${fmtB(a.from)} → ${fmtB(a.to)}` : ''}</span>
+          ${manage ? `<span style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn" data-approve="${a.id}">✓ อนุมัติ</button>
+            <button class="btn ghost" data-reject="${a.id}">✕ ปฏิเสธ</button></span>` : ''}
+        </div>
+        <div class="r">${esc(a.reason)}</div>
+      </div>`).join('')}
+  </div>`;
+  box.querySelectorAll('[data-approve]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    try { await api('/ads/actions/' + b.dataset.approve + '/approve', { method: 'POST' }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsDynamic();
+  });
+  box.querySelectorAll('[data-reject]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    try { await api('/ads/actions/' + b.dataset.reject + '/reject', { method: 'POST' }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsDynamic();
+  });
+}
+
+function renderAdsEntities() {
+  const box = $('#adsEntities');
+  if (!box) return;
+  const manage = adsData.canManage;
+  const policy = adsData.policy;
+  const roasCell = (k) => k.roas == null ? '<span class="muted">—</span>'
+    : `<span class="${k.roas >= policy.targetRoas ? 'roas-good' : k.roas < policy.targetRoas / 2 ? 'roas-bad' : ''}">${k.roas}x</span>`;
+  const cpaCell = (k) => k.cpa == null ? '<span class="muted">—</span>'
+    : `<span class="${k.cpa <= policy.targetCpa ? 'roas-good' : k.cpa > policy.targetCpa * 1.5 ? 'roas-bad' : ''}">${fmtB(k.cpa)}</span>`;
+  box.innerHTML = adsData.entities.length ? `<table>
+    <thead><tr><th>ชื่อ</th><th>สถานะ</th><th class="num">งบ/วัน</th><th class="num">Impr</th><th class="num">Clicks</th>
+      <th class="num">CTR</th><th class="num">ใช้ไป</th><th class="num">Leads</th><th class="num">CPA</th><th class="num">ROAS</th>
+      <th>AI</th>${manage ? '<th></th>' : ''}</tr></thead>
+    <tbody>${adsData.entities.map((e) => {
+      const k = e.kpis;
+      const p = adsData.platforms[e.platform] || {};
+      return `<tr>
+        <td class="ads-name ads-depth${e.depth}" style="max-width:340px">
+          <span>${e.depth === 0 ? (p.icon || '') : ''}${AD_LEVEL_ICON[e.level] || ''}</span>
+          <span class="nm" title="${esc(e.name)}">${esc(e.name)}</span></td>
+        <td><span class="pill ${e.status === 'active' ? 'role-agent' : ''}">${e.status === 'active' ? '● on' : '○ off'}</span></td>
+        <td class="num">${e.dailyBudget != null
+          ? (manage ? `<input type="number" class="ads-budget-input" data-budget="${e.id}" value="${e.dailyBudget}" min="1" />` : fmtB(e.dailyBudget))
+          : (e.bid != null ? `<span class="muted" title="bid">bid ${fmtB(e.bid)}</span>` : '<span class="muted">—</span>')}</td>
+        <td class="num">${fmtN(k.imp)}</td>
+        <td class="num">${fmtN(k.clk)}</td>
+        <td class="num">${k.ctr}%</td>
+        <td class="num">${fmtB(k.spend)}</td>
+        <td class="num">${fmtN(k.conv)}</td>
+        <td class="num">${cpaCell(k)}</td>
+        <td class="num">${roasCell(k)}</td>
+        <td>${e.aiPausedBy ? '<span class="chip sla-breach" title="AI หยุดให้">⛔ AI</span>' : ''}${e.aiExcluded ? '<span class="chip" title="AI ไม่ยุ่ง">🚫 manual</span>' : ''}</td>
+        ${manage ? `<td style="white-space:nowrap">
+          <button class="btn ghost" data-toggle="${e.id}" data-kind="${e.status === 'active' ? 'pause' : 'resume'}" title="${e.status === 'active' ? 'หยุด' : 'เปิด'}">${e.status === 'active' ? '⏸' : '▶'}</button>
+          <button class="btn ghost" data-excl="${e.id}" data-next="${e.aiExcluded ? 'false' : 'true'}" title="${e.aiExcluded ? 'ให้ AI ดูแลตัวนี้' : 'ห้าม AI ยุ่งตัวนี้'}">${e.aiExcluded ? '🤖' : '✋'}</button>
+        </td>` : ''}
+      </tr>`;
+    }).join('')}</tbody></table>` : '<p class="muted">ยังไม่มีบัญชีโฆษณา — เพิ่มด้านล่าง</p>';
+
+  if (!manage) return;
+  box.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => {
+    try { await api('/ads/entities/' + b.dataset.toggle + '/action', { method: 'POST', body: JSON.stringify({ kind: b.dataset.kind }) }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsDynamic();
+  });
+  box.querySelectorAll('[data-excl]').forEach((b) => b.onclick = async () => {
+    try { await api('/ads/entities/' + b.dataset.excl, { method: 'PUT', body: JSON.stringify({ aiExcluded: b.dataset.next === 'true' }) }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsDynamic();
+  });
+  box.querySelectorAll('[data-budget]').forEach((inp) => inp.onchange = async () => {
+    const v = Number(inp.value);
+    if (!(v > 0)) return alert('งบต้องมากกว่า 0');
+    try { await api('/ads/entities/' + inp.dataset.budget + '/action', { method: 'POST', body: JSON.stringify({ kind: 'budget', value: v }) }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsDynamic();
+  });
+}
+
+function renderAdsPolicy() {
+  const box = $('#adsPolicyCard');
+  if (!box) return;
+  const p = adsData.policy;
+  const manage = adsData.canManage;
+  const dis = manage ? '' : 'disabled';
+  const chk = (id, label, checked) =>
+    `<div><label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--text)"><input type="checkbox" id="${id}" ${checked ? 'checked' : ''} ${dis}/> ${label}</label></div>`;
+  box.innerHTML = `<div class="card">
+    <h3 style="margin-top:0">⚙️ นโยบายการ Optimize (guardrails ของ AI)</h3>
+    <div class="form-grid">
+      <div><label>โหมด</label><select id="apMode" ${dis}>
+        <option value="auto" ${p.mode === 'auto' ? 'selected' : ''}>⚡ Auto — AI ปรับให้ทันที</option>
+        <option value="suggest" ${p.mode === 'suggest' ? 'selected' : ''}>✋ Suggest — เสนอให้อนุมัติก่อน</option>
+      </select></div>
+      <div><label>รอบการทำงาน (วินาที)</label><input type="number" id="apInterval" value="${p.intervalSec}" min="30" ${dis}/></div>
+      <div><label>เป้า CPA (฿/lead)</label><input type="number" id="apCpa" value="${p.targetCpa}" min="1" ${dis}/></div>
+      <div><label>เป้า ROAS (เท่า)</label><input type="number" id="apRoas" value="${p.targetRoas}" step="0.1" min="0.1" ${dis}/></div>
+      <div><label>ใช้งบขั้นต่ำก่อนตัดสิน (฿)</label><input type="number" id="apMinSpend" value="${p.minSpendForDecision}" min="0" ${dis}/></div>
+      <div><label>Impressions ขั้นต่ำ (เทียบ CTR)</label><input type="number" id="apMinImp" value="${p.minImpressions}" min="0" ${dis}/></div>
+      <div><label>ปรับงบครั้งละไม่เกิน (%)</label><input type="number" id="apMaxPct" value="${p.maxBudgetChangePct}" min="1" max="100" ${dis}/></div>
+      <div><label>งบขั้นต่ำ/สูงสุด ต่อวัน (฿)</label>
+        <div style="display:flex;gap:6px"><input type="number" id="apFloor" value="${p.budgetFloor}" min="0" ${dis} style="width:50%"/><input type="number" id="apCap" value="${p.budgetCap}" min="1" ${dis} style="width:50%"/></div></div>
+      <div><label>Cooldown ต่อรายการ (นาที)</label><input type="number" id="apCooldown" value="${p.cooldownMin}" min="0" ${dis}/></div>
+      <div><label>เพดาน action ต่อรอบ</label><input type="number" id="apMaxActs" value="${p.maxActionsPerCycle}" min="1" ${dis}/></div>
+    </div>
+    <div class="form-grid" style="margin-top:12px">
+      ${chk('apEnabled', '🟢 เปิดใช้งาน AI optimizer', p.enabled)}
+      ${chk('apPause', '⏸ หยุดแอดที่เผางบ (CPA เกินเป้า)', p.autoPause)}
+      ${chk('apBudget', '💰 ปรับงบอัตโนมัติ (เพิ่มตัวชนะ/ลดตัวแพ้)', p.autoBudget)}
+      ${chk('apBid', '🎯 ปรับ bid อัตโนมัติ', p.autoBid)}
+      ${chk('apRotate', '🔁 หยุดครีเอทีฟที่แพ้ A/B test', p.autoRotate)}
+      ${chk('apDaypart', `🕐 ยิงเฉพาะช่วงเวลา (Dayparting)`, p.dayparting.enabled)}
+      <div><label>ช่วงเวลายิงแอด (ชม. เริ่ม–จบ)</label>
+        <div style="display:flex;gap:6px"><input type="number" id="apDayStart" value="${p.dayparting.start}" min="0" max="23" ${dis} style="width:50%"/><input type="number" id="apDayEnd" value="${p.dayparting.end}" min="1" max="24" ${dis} style="width:50%"/></div></div>
+      ${chk('apAlSpike', '🚨 เตือนใช้งบเกินโควตา', p.alerts.spendSpike)}
+      ${chk('apAlCtr', '📉 เตือน CTR ตกผิดปกติ', p.alerts.ctrDrop)}
+      ${chk('apAlZero', '🚫 เตือนแอดไม่ delivery', p.alerts.zeroDelivery)}
+    </div>
+    ${manage ? '<button class="btn" id="apSave" style="margin-top:12px">บันทึกนโยบาย</button> <span id="apResult" class="muted"></span>' : '<p class="muted" style="margin-top:10px">ต้องมีสิทธิ์ Manage Ads (Owner/Admin) จึงจะแก้ไขได้</p>'}
+  </div>`;
+  if (!manage) return;
+  $('#apSave').onclick = async () => {
+    try {
+      adsData.policy = await api('/ads/policy', { method: 'PUT', body: JSON.stringify({
+        enabled: $('#apEnabled').checked, mode: $('#apMode').value,
+        intervalSec: Number($('#apInterval').value), targetCpa: Number($('#apCpa').value),
+        targetRoas: Number($('#apRoas').value), minSpendForDecision: Number($('#apMinSpend').value),
+        minImpressions: Number($('#apMinImp').value), maxBudgetChangePct: Number($('#apMaxPct').value),
+        budgetFloor: Number($('#apFloor').value), budgetCap: Number($('#apCap').value),
+        cooldownMin: Number($('#apCooldown').value), maxActionsPerCycle: Number($('#apMaxActs').value),
+        autoPause: $('#apPause').checked, autoBudget: $('#apBudget').checked,
+        autoBid: $('#apBid').checked, autoRotate: $('#apRotate').checked,
+        dayparting: { enabled: $('#apDaypart').checked, start: Number($('#apDayStart').value), end: Number($('#apDayEnd').value) },
+        alerts: { spendSpike: $('#apAlSpike').checked, ctrDrop: $('#apAlCtr').checked, zeroDelivery: $('#apAlZero').checked },
+      }) });
+      $('#apResult').textContent = '✓ บันทึกแล้ว — มีผลรอบถัดไป';
+      const pill = $('#adsModePill');
+      if (pill) {
+        pill.className = 'mode-pill ' + (adsData.policy.mode === 'auto' ? 'mode-auto' : 'mode-suggest');
+        pill.textContent = adsData.policy.mode === 'auto' ? '⚡ AUTO — AI ปรับให้เอง' : '✋ SUGGEST — รออนุมัติ';
+      }
+      renderAdsDynamic();
+    } catch (e) { $('#apResult').textContent = '✕ ' + e.message; }
+  };
+}
+
+function renderAdsAccounts() {
+  const box = $('#adsAccountsCard');
+  if (!box) return;
+  const manage = adsData.canManage;
+  box.innerHTML = `<div class="card">
+    <h3 style="margin-top:0">🔌 บัญชีโฆษณา (Ad Accounts)</h3>
+    <p class="muted" style="font-size:12px">ไม่ใส่ credentials = โหมดจำลอง (มีข้อมูลเดโมให้ AI ทำงานครบทุกฟีเจอร์) · ใส่ token จริงเมื่อพร้อมยิงจริง — ระบบจะ sync และปรับแอดจริงผ่าน Marketing API / Google Ads API</p>
+    <table><thead><tr><th>Platform</th><th>บัญชี</th><th>การเชื่อมต่อ</th><th>Sync ล่าสุด</th>${manage ? '<th></th>' : ''}</tr></thead>
+    <tbody>${adsData.accounts.map((a) => {
+      const p = adsData.platforms[a.platform] || {};
+      return `<tr>
+        <td>${p.icon || ''} ${esc(p.label || a.platform)}</td>
+        <td>${esc(a.name)}</td>
+        <td><span class="pill ${a.simulated ? '' : 'role-agent'}">${a.simulated ? '○ simulated' : '● connected'}</span>
+          ${a.syncError ? `<div class="muted" style="color:#f1707a;font-size:11px">✕ ${esc(a.syncError)}</div>` : ''}</td>
+        <td class="muted">${a.lastSyncAt ? timeAgo(a.lastSyncAt) : '—'}</td>
+        ${manage ? `<td style="white-space:nowrap">
+          <button class="btn ghost" data-accedit="${a.id}">เชื่อมต่อ/แก้ไข</button>
+          <button class="btn ghost" data-accstatus="${a.id}" data-next="${a.status === 'active' ? 'paused' : 'active'}">${a.status === 'active' ? 'พัก' : 'เปิด'}</button>
+          <button class="btn ghost" data-accdel="${a.id}">✕</button></td>` : ''}
+      </tr>
+      ${manage && adsAccountEditing === a.id ? `<tr><td colspan="5">
+        <div class="form-grid" data-accform="${a.id}">
+          ${(AD_CRED_FIELDS[a.platform] || []).map(([k, lbl]) =>
+            `<div><label>${lbl}</label><input data-cred="${k}" placeholder="${a.credential[k] ? '•••• configured (เว้นว่าง = คงเดิม)' : 'ยังไม่ตั้งค่า'}" /></div>`).join('')}
+          <div><button class="btn" data-accsave="${a.id}">บันทึก credentials</button></div>
+        </div></td></tr>` : ''}`;
+    }).join('')}</tbody></table>
+    ${manage ? `<div style="margin-top:14px"><h4 style="margin:0 0 8px;font-size:13px">➕ เพิ่มบัญชีโฆษณา</h4>
+      <div class="form-grid">
+        <div><label>Platform</label><select id="naPlatform">${Object.entries(adsData.platforms).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
+        <div><label>ชื่อบัญชี</label><input id="naName" placeholder="เช่น Meta Ads — โครงการ B" /></div>
+        <div><button class="btn" id="naAdd">เพิ่มบัญชี</button></div>
+      </div></div>` : ''}
+  </div>`;
+  if (!manage) return;
+  box.querySelectorAll('[data-accedit]').forEach((b) => b.onclick = () => {
+    adsAccountEditing = adsAccountEditing === b.dataset.accedit ? null : b.dataset.accedit;
+    renderAdsAccounts();
+  });
+  box.querySelectorAll('[data-accsave]').forEach((b) => b.onclick = async () => {
+    const form = box.querySelector(`[data-accform="${b.dataset.accsave}"]`);
+    const credential = {};
+    form.querySelectorAll('[data-cred]').forEach((i) => { if (i.value.trim()) credential[i.dataset.cred] = i.value.trim(); });
+    try {
+      await api('/ads/accounts/' + b.dataset.accsave, { method: 'PUT', body: JSON.stringify({ credential }) });
+      adsAccountEditing = null;
+      await loadAdsOverview(); renderAdsAccounts(); renderAdsDynamic();
+    } catch (e) { alert(e.message); }
+  });
+  box.querySelectorAll('[data-accstatus]').forEach((b) => b.onclick = async () => {
+    try { await api('/ads/accounts/' + b.dataset.accstatus, { method: 'PUT', body: JSON.stringify({ status: b.dataset.next }) }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsAccounts();
+  });
+  box.querySelectorAll('[data-accdel]').forEach((b) => b.onclick = async () => {
+    if (!confirm('ลบบัญชีนี้พร้อมข้อมูลแคมเปญ/สถิติที่ sync ไว้?')) return;
+    try { await api('/ads/accounts/' + b.dataset.accdel, { method: 'DELETE' }); }
+    catch (e) { alert(e.message); }
+    await loadAdsOverview(); renderAdsAccounts(); renderAdsDynamic();
+  });
+  if ($('#naAdd')) $('#naAdd').onclick = async () => {
+    try {
+      await api('/ads/accounts', { method: 'POST', body: JSON.stringify({ platform: $('#naPlatform').value, name: $('#naName').value }) });
+      await loadAdsOverview(); renderAdsAccounts(); renderAdsDynamic();
+    } catch (e) { alert(e.message); }
+  };
+}
+let adsAccountEditing = null;
+
+async function runAdsAnalysis() {
+  const btn = $('#adsAnalyzeBtn');
+  const panel = $('#adsAiPanel');
+  if (!panel) return;
+  if (btn) { btn.disabled = true; btn.textContent = '🧠 กำลังวิเคราะห์…'; }
+  panel.innerHTML = '<div class="card"><p class="muted">🧠 AI กำลังอ่านข้อมูลพอร์ตโฆษณาทั้งหมด…</p></div>';
+  try {
+    const r = await api('/ads/analyze', { method: 'POST' });
+    panel.innerHTML = `<div class="card" style="border-color:#7c5cff">
+      <h3 style="margin-top:0">🧠 บทวิเคราะห์จาก ${r.source === 'claude' ? 'Claude' : 'ระบบ (พื้นฐาน)'}
+        ${r.model ? `<span class="muted" style="font-size:11px;font-weight:400">· ${esc(r.model)}</span>` : ''}</h3>
+      ${r.error ? `<p class="muted" style="color:#f1707a">${esc(r.error)}</p>` : ''}
+      <p style="line-height:1.7;margin:6px 0">${esc(r.summary)}</p>
+      ${(r.insights || []).map((i) => `<div class="insight ${i.severity}"><div class="it">${esc(i.title)}</div><div class="id">${esc(i.detail)}</div></div>`).join('')}
+      ${(r.proposedActions || []).length ? `<p style="margin:12px 0 0">✋ Claude เสนอ ${r.proposedActions.length} action — เข้าคิวรออนุมัติด้านบนแล้ว</p>` : ''}
+    </div>`;
+    await loadAdsOverview(); renderAdsDynamic();
+  } catch (e) {
+    panel.innerHTML = `<div class="card"><p class="muted">✕ วิเคราะห์ไม่สำเร็จ: ${esc(e.message)}</p></div>`;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🧠 วิเคราะห์ด้วย Claude' + (adsData?.ai?.claude ? '' : ' (พื้นฐาน)'); }
 }
 
 // ── Simulator ────────────────────────────────────────────────────────────────────

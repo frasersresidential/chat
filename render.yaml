@@ -25,6 +25,11 @@ services:
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
+      # Ads AI: Claude strategy advisor (optional — leave blank to use the
+      # built-in heuristic analysis). Meta/Google Ads tokens are entered in
+      # the app's Ads AI tab instead, so they don't need env vars.
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
   # Gamification Studio — the lucky-draw games + reports, deployed as its own
   # service (separate from the OmniChat inbox). It shares the same Postgres DB

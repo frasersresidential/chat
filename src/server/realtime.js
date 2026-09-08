@@ -71,5 +71,11 @@ export function attachRealtime(server) {
 
   bus.on('notification:created', (n) => sendToUser(n.userId, { type: 'notification:created', notification: n }));
 
+  // AI ads optimizer — live action feed + per-cycle KPI summary.
+  bus.on('ads:action', ({ organizationId, action }) =>
+    broadcastOrg(organizationId, { type: 'ads:action', action }));
+  bus.on('ads:tick', ({ organizationId, summary }) =>
+    broadcastOrg(organizationId, { type: 'ads:tick', summary }));
+
   return wss;
 }
