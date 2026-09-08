@@ -37,6 +37,9 @@ const EMPTY = () => ({
   adEntities: {},
   adMetrics: {},
   adActions: {},
+  gameCampaigns: {},
+  gameDraws: {},
+  gameEntries: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -122,6 +125,9 @@ export const db = {
   adEntities: collection('adEntities'),
   adMetrics: collection('adMetrics'),
   adActions: collection('adActions'),
+  gameCampaigns: collection('gameCampaigns'),
+  gameDraws: collection('gameDraws'),
+  gameEntries: collection('gameEntries'),
 
   /**
    * Load persisted data. When DATABASE_URL is set, hydrate from Postgres and

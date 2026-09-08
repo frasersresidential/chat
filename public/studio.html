@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Lucky Draw Studio</title>
+  <meta name="theme-color" content="#0e1117" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">🎯 <span>Lucky Draw Studio</span></div>
+      <nav class="nav" id="nav">
+        <button data-view="games" class="active">Games</button>
+        <button data-view="reports">Reports</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="whoami" class="pill"></span>
+        <a class="icon-btn" href="/games.html?c=game_lucky_draw" target="_blank" title="เปิดหน้าเกมตัวอย่าง">🎮</a>
+        <button id="logoutBtn" class="icon-btn" title="ออกจากระบบ">⏏</button>
+      </div>
+    </header>
+    <div id="main"></div>
+  </div>
+
+  <script src="/studio.js" type="module"></script>
+</body>
+</html>

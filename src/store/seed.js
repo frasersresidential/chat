@@ -169,6 +169,84 @@ export function seedIfEmpty() {
     name: 'Google Ads — Company A', credential: {}, status: 'active', currency: 'THB',
   });
 
+  // ── Gamification: demo lucky-draw campaign (open /games.html to play) ────
+  db.gameCampaigns.insert({
+    id: 'game_lucky_draw',
+    organizationId: O,
+    name: 'ลุ้นโชคกับ Frasers Property',
+    displayName: 'ลุ้นโชคกับ Frasers Property',
+    bgDesktopUrl: '/banners/shock-bg-desktop.webp',
+    bgMobileUrl: '/banners/shock-bg-mobile.webp',
+    active: true,
+    game: 'wheel',
+    limitPerDay: 3,
+    theme: {
+      preset: 'frasers',
+      // Rim (accent) = deep pink; segments are set per-prize below.
+      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#c2185b', accent2: '#333f48', highlight: '#c9a557' },
+      style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
+    },
+    // Entry gate: players fill the form and enter this code before playing.
+    gate: {
+      enabled: true,
+      code: 'FP2024',
+      projects: [
+        'The Grand พระราม 9', 'Golden Neo สุขุมวิท', 'Neo Home บางนา',
+        'Grand Park วิภาวดี', 'Frasers Ville รังสิต', 'The Rich รัชดา',
+      ],
+    },
+    // 6 segments alternating white / light-pink, plus one red 100,000 prize.
+    prizes: [
+      { id: 'pz_500', label: 'ส่วนลด 500 บาท', win: true, weight: 18, stock: null, color: '#ffffff', couponPrefix: 'LUCKY500' },
+      { id: 'pz_gift', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 14, stock: 20, color: '#f9c9dc', couponPrefix: 'GIFT' },
+      { id: 'pz_1000', label: 'ส่วนลด 1,000 บาท', win: true, weight: 8, stock: null, color: '#ffffff', couponPrefix: 'LUCKY1000' },
+      { id: 'pz_fee', label: 'ฟรีค่าธรรมเนียม', win: true, weight: 14, stock: null, color: '#f9c9dc', couponPrefix: 'FEEFREE' },
+      { id: 'pz_none', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 45, stock: null, color: '#ffffff' },
+      { id: 'pz_big', label: 'รางวัลใหญ่ 100,000 บาท', win: true, weight: 1, stock: 1, color: '#e30613', couponPrefix: 'BIG100K' },
+    ],
+  });
+
+  // ── Locked-prize reward links ─────────────────────────────────────────────
+  // 5 ready-made links, each a full "ลุ้น" wheel (small prizes + ขอบคุณ mixed
+  // in) but locked to the big prize so it comes out every play. Sales staff
+  // pick the link matching the prize they want the customer to win.
+  const th = (str) => Number(str).toLocaleString('en-US'); // 100000 -> "100,000"
+  const rewardLink = (amount) => db.gameCampaigns.insert({
+    id: 'reward_' + amount,
+    organizationId: O,
+    name: `ลิงก์รางวัลใหญ่ ${th(amount)} บาท`,          // internal label (staff)
+    displayName: 'ลุ้นโชคกับ Frasers Property',          // what the customer sees
+    bgDesktopUrl: '/banners/shock-bg-desktop.webp',
+    bgMobileUrl: '/banners/shock-bg-mobile.webp',
+    active: true,
+    game: 'wheel',
+    limitPerDay: 1,
+    theme: {
+      preset: 'frasers',
+      colors: { bg: '#f7f5f2', surface: '#ffffff', ink: '#333f48', muted: '#828a92', accent: '#da291c', accent2: '#333f48', highlight: '#c9a557' },
+      style: { radius: 8, borderWidth: 1, shadow: 'soft', pattern: 'none' },
+    },
+    gate: {
+      enabled: true,
+      code: 'FP2024',
+      projects: [
+        'The Grand พระราม 9', 'Golden Neo สุขุมวิท', 'Neo Home บางนา',
+        'Grand Park วิภาวดี', 'Frasers Ville รังสิต', 'The Rich รัชดา',
+      ],
+    },
+    // The wheel always stops here — the fillers below are just for show.
+    forcedPrizeId: 'big',
+    prizes: [
+      { id: 'big', label: `รางวัลใหญ่ ${th(amount)} บาท`, win: true, weight: 1, stock: null, color: '#c9a557', couponPrefix: `WIN${amount}` },
+      { id: 'f1', label: 'ของที่ระลึกสุดพิเศษ', win: true, weight: 1, stock: null, color: '#da291c', couponPrefix: 'GIFT' },
+      { id: 'f2', label: 'ส่วนลด 500 บาท', win: true, weight: 1, stock: null, color: '#f6efe3', couponPrefix: 'D500' },
+      { id: 'f3', label: 'ส่งฟรีทั่วไทย', win: true, weight: 1, stock: null, color: '#da291c', couponPrefix: 'FREESHIP' },
+      { id: 'f4', label: 'ลุ้นใหม่รอบหน้า', win: false, weight: 1, stock: null, color: '#f6efe3' },
+      { id: 'f5', label: 'ขอบคุณที่ร่วมสนุก', win: false, weight: 1, stock: null, color: '#97231c' },
+    ],
+  });
+  [10000, 20000, 30000, 50000, 100000].forEach(rewardLink);
+
   // ── Auto-replies / chatbot ───────────────────────────────────────────────
   const auto = (type, text, keywords = []) =>
     db.autoReplies.insert({ organizationId: org.id, type, text, keywords, channelAccountId: null, enabled: true });

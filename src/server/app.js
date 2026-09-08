@@ -85,6 +85,10 @@ export function createApp() {
   });
   app.use('/api/auth', auth);
 
+  // Lucky-draw games + reports are a separate tool — see src/studio/ (its own
+  // server, its own /games.html + /api/games routes). The inbox no longer
+  // serves them.
+
   const api = express.Router();
   api.use(authMiddleware);
 
