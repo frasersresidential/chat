@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   MANAGE_ROUTING: 'manage_routing',
   MANAGE_AUTOMATION: 'manage_automation',
   MANAGE_ADS: 'manage_ads',
+  MANAGE_ERP: 'manage_erp',
   VIEW_ALL_CONVERSATIONS: 'view_all_conversations',
   VIEW_TEAM_CONVERSATIONS: 'view_team_conversations',
   VIEW_ANALYTICS: 'view_analytics',
@@ -38,8 +39,8 @@ export const ROLES = {
     eligibleForAssignment: false,
     permissions: [
       P.MANAGE_USERS, P.MANAGE_CHANNELS, P.MANAGE_TEAMS, P.MANAGE_ROUTING,
-      P.MANAGE_AUTOMATION, P.MANAGE_ADS, P.VIEW_ALL_CONVERSATIONS, P.VIEW_ANALYTICS,
-      P.REPLY, P.ASSIGN, P.TAKEOVER, P.TRANSFER,
+      P.MANAGE_AUTOMATION, P.MANAGE_ADS, P.MANAGE_ERP, P.VIEW_ALL_CONVERSATIONS,
+      P.VIEW_ANALYTICS, P.REPLY, P.ASSIGN, P.TAKEOVER, P.TRANSFER,
     ],
   },
   manager: {
@@ -47,7 +48,7 @@ export const ROLES = {
     eligibleForAssignment: false, // "Cannot: Receive round robin assignment"
     permissions: [
       P.VIEW_ALL_CONVERSATIONS, P.VIEW_TEAM_CONVERSATIONS, P.VIEW_ANALYTICS,
-      P.REPLY, P.ASSIGN, P.TAKEOVER, P.TRANSFER,
+      P.MANAGE_ERP, P.REPLY, P.ASSIGN, P.TAKEOVER, P.TRANSFER,
     ],
   },
   supervisor: {

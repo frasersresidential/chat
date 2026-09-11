@@ -77,5 +77,9 @@ export function attachRealtime(server) {
   bus.on('ads:tick', ({ organizationId, summary }) =>
     broadcastOrg(organizationId, { type: 'ads:tick', summary }));
 
+  // ERP — any quote/order/stock change nudges open ERP screens to refresh.
+  bus.on('erp:changed', ({ organizationId, kind }) =>
+    broadcastOrg(organizationId, { type: 'erp:changed', kind }));
+
   return wss;
 }

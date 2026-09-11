@@ -20,6 +20,7 @@ import { handoverUserConversations } from '../core/handover.js';
 import { vapidPublicKey, saveSubscription, pushEnabled } from '../core/push.js';
 import { CHANNEL_META, CHANNEL_TYPES } from '../channels/registry.js';
 import { createAdsRouter } from './adsApi.js';
+import { createErpRouter } from './erpApi.js';
 import { mountWebhooks } from './webhooks.js';
 import { logger } from '../logger.js';
 
@@ -595,6 +596,9 @@ export function createApp() {
 
   // ── AI ads optimization (Meta / Google) ───────────────────────────────────
   api.use('/ads', createAdsRouter());
+
+  // ── ERP (โรงพิมพ์สติกเกอร์) ───────────────────────────────────────────────
+  api.use('/erp', createErpRouter());
 
   app.use('/api', api);
 
