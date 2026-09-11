@@ -21,12 +21,19 @@ export async function initPush() {
   }
   let pub = process.env.VAPID_PUBLIC_KEY;
   let priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) {
+  const subject = process.env.VAPID_SUBJECT || 'mailto:admin@omnichat.app';
+  // A blank or malformed pair (e.g. a placeholder typed into a deploy form)
+  // must never take the whole app down — fall back to an ephemeral pair.
+  try {
+    if (!pub || !priv) throw new Error('missing');
+    webpush.setVapidDetails(subject, pub, priv);
+  } catch (e) {
+    if (e.message !== 'missing') log.warn(`invalid VAPID keys (${e.message}) — using ephemeral keys instead`);
     const keys = webpush.generateVAPIDKeys();
     pub = keys.publicKey; priv = keys.privateKey;
+    webpush.setVapidDetails(subject, pub, priv);
     log.warn('generated ephemeral VAPID keys (set VAPID_PUBLIC_KEY/PRIVATE_KEY to persist)');
   }
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@omnichat.app', pub, priv);
   vapid = { pub, priv };
   log.info('web push ready');
 }
