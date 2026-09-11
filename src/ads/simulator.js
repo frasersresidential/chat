@@ -51,19 +51,19 @@ export function ensureSimPortfolio(account) {
   // weak one clearly below it.
   const campaigns = isMeta
     ? [
-      { name: 'RYM — Rhythm รัชดา | Messages', objective: 'MESSAGES', lead: 1600 },
-      { name: 'LPN — Lumpini สุขุมวิท | Messages', objective: 'MESSAGES', lead: 1100 },
-      { name: 'Brand Awareness Q3', objective: 'AWARENESS', lead: 700 },
+      { name: 'LABEL — สติกเกอร์ฉลากสินค้า | Messages', objective: 'MESSAGES', lead: 1600 },
+      { name: 'LOGO — สติกเกอร์โลโก้แบรนด์ | Messages', objective: 'MESSAGES', lead: 1100 },
+      { name: 'Brand Awareness โรงพิมพ์', objective: 'AWARENESS', lead: 700 },
     ]
     : [
-      { name: 'Search — คอนโด Rhythm RYM', objective: 'SEARCH', lead: 1600 },
-      { name: 'Search — คอนโด Lumpini LPN', objective: 'SEARCH', lead: 1100 },
-      { name: 'PMax — โครงการพร้อมอยู่', objective: 'PMAX', lead: 800 },
+      { name: 'Search — พิมพ์สติกเกอร์ฉลากสินค้า LABEL', objective: 'SEARCH', lead: 1600 },
+      { name: 'Search — สติกเกอร์โลโก้ ราคาส่ง LOGO', objective: 'SEARCH', lead: 1100 },
+      { name: 'PMax — สั่งพิมพ์สติกเกอร์ด่วน', objective: 'PMAX', lead: 800 },
     ];
   const audiences = isMeta
-    ? ['Lookalike ผู้ทักแชต 1%', 'Interest คอนโด-การลงทุน', 'Retargeting เว็บ 30 วัน']
-    : ['กลุ่มคำหลัก ราคา/โปร', 'กลุ่มคำหลัก ทำเล', 'กลุ่มคำหลัก แบรนด์'];
-  const creatives = ['วิดีโอห้องตัวอย่าง', 'โปรฟรีทุกค่าใช้จ่าย', 'ภาพชุด ส่วนกลาง', 'รีวิวลูกบ้าน'];
+    ? ['Lookalike ผู้ทักแชต 1%', 'Interest แม่ค้าออนไลน์-SME', 'Retargeting เว็บ 30 วัน']
+    : ['กลุ่มคำหลัก ราคา/สั่งผลิต', 'กลุ่มคำหลัก ฉลากกันน้ำ', 'กลุ่มคำหลัก แบรนด์'];
+  const creatives = ['วิดีโอรีวิวงานพิมพ์', 'โปรฉลากกันน้ำ', 'ภาพตัวอย่างงานลูกค้า', 'รีวิวลูกค้าแม่ค้า'];
 
   const rows = [];
   campaigns.forEach((c, ci) => {

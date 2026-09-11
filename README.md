@@ -42,6 +42,7 @@ phone or computer. Log in with `u_owner@company-a.com` / `demo1234`.
 | **Sales pipeline** | Drag-and-drop Kanban (new→contacted→qualified→proposal→won→lost) + resolve/reopen. |
 | **Automation** | Welcome / away / keyword auto-replies (chatbot) and filtered broadcast campaigns. |
 | **🤖 AI Ads Optimization** | Real-time AI optimizer for **Meta Ads + Google Ads**: syncs campaigns/ad sets/ads every cycle, pauses budget-burners, scales winners' budgets, tunes bids, kills A/B losing creatives, dayparting, anomaly alerts — with guardrails (caps, floors, cooldowns), auto vs approval mode, live action feed, and a **Claude-powered strategy advisor**. Runs on a realistic delivery simulator with zero credentials. |
+| **🏭 ERP (โรงพิมพ์สติกเกอร์)** | Made-to-order print-shop ERP at `/erp.html` (same login): **price calculator** (size × qty × material × laminate × die-cut, tiered margins) with quote-from-chat, quotes → job orders on a **drag-drop production queue** (job tickets, due-date alerts), **roll/ตร.ม. raw-material stock** (auto-consume on queue with waste %, avg-cost stock-in, reorder alerts, auto-return on cancel), customer die library, payments → invoices/receipts (printable; **VAT/WHT switches** off until registered), and auto status messages to the customer's own chat channel. Paid revenue feeds back into chat deal values → real ROAS in Ads AI. |
 | **Gamification** | Customer lucky-draw mini-games at `/games.html` — spin-the-wheel, เซียมซี fortune sticks and tarot card flip, all on one server-side prize engine (weighted odds, stock, daily limits, coupon codes). Optional **registration gate** (name / project picklist / plot / access-code) validated server-side before play, plus a captured-leads report. A **Games admin tab** edits campaigns, prizes, the entry gate and the full visual theme (presets + per-color pickers, radius/border/shadow/pattern) with no code changes; tablet/iPad-optimized layout. |
 | **Auth** | Email/password login with JWTs; secured Owner/Admin impersonation. |
 | **Reports** | Date-range analytics, grade & pipeline funnels, agent leaderboard, CSV export. |
@@ -105,10 +106,12 @@ src/
   core/          rbac, presence, teams, routing, conversations, notifications, eventBus
   ads/           AI ads optimization: providers (Meta/Google), simulator, metrics engine,
                  optimizer (decision rules + guardrails), Claude advisor
+  erp/           print-shop ERP: pricing calculator, stock engine, quote/order lifecycle,
+                 doc numbering, settings (VAT switch), seed
   store/         db (JSON document store), seed, envCredentials
-  server/        app (REST), adsApi, webhooks, realtime (WebSocket)
-public/          zero-build SPA agent console + admin UI
-test/            routing / RBAC / ads-optimizer tests
+  server/        app (REST), adsApi, erpApi, webhooks, realtime (WebSocket)
+public/          zero-build SPA agent console + admin UI (+ erp.html ERP console)
+test/            routing / RBAC / ads-optimizer / ERP tests
 ```
 
 The storage layer (`src/store/db.js`) is a zero-dependency JSON document store

@@ -40,6 +40,14 @@ const EMPTY = () => ({
   gameCampaigns: {},
   gameDraws: {},
   gameEntries: {},
+  // ERP (โรงพิมพ์สติกเกอร์): ลูกค้า, วัสดุ+สต๊อก, บล็อกไดคัท, เอกสารขาย, ใบงาน
+  erpCustomers: {},
+  erpMaterials: {},
+  erpStockMoves: {},
+  erpDies: {},
+  erpQuotes: {},
+  erpOrders: {},
+  erpInvoices: {},
   // round-robin cursor per "teamId" so assignment rotates fairly
   rrCursors: {},
 });
@@ -128,6 +136,13 @@ export const db = {
   gameCampaigns: collection('gameCampaigns'),
   gameDraws: collection('gameDraws'),
   gameEntries: collection('gameEntries'),
+  erpCustomers: collection('erpCustomers'),
+  erpMaterials: collection('erpMaterials'),
+  erpStockMoves: collection('erpStockMoves'),
+  erpDies: collection('erpDies'),
+  erpQuotes: collection('erpQuotes'),
+  erpOrders: collection('erpOrders'),
+  erpInvoices: collection('erpInvoices'),
 
   /**
    * Load persisted data. When DATABASE_URL is set, hydrate from Postgres and

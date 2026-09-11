@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ERP โรงพิมพ์สติกเกอร์ — OmniChat</title>
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/erp.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">🏭 <span>ERP</span> <span class="muted" style="font-size:12px;font-weight:400">โรงพิมพ์สติกเกอร์</span></div>
+      <nav class="nav" id="nav">
+        <button data-view="dash" class="active">แดชบอร์ด</button>
+        <button data-view="quotes">ใบเสนอราคา</button>
+        <button data-view="queue">คิวผลิต<span id="queueBadge" class="navbadge hidden">0</span></button>
+        <button data-view="stock">สต๊อก<span id="stockBadge" class="navbadge hidden">0</span></button>
+        <button data-view="customers">ลูกค้า</button>
+        <button data-view="settings">ตั้งค่า</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="meName" class="muted" style="font-size:12px"></span>
+        <a class="icon-btn" href="/" title="กลับหน้าแชต">📨 แชต</a>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+  <script src="/erp.js" type="module"></script>
+</body>
+</html>

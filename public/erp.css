@@ -1,0 +1,80 @@
+/* ERP-specific styles — layered on top of styles.css design tokens. */
+a.icon-btn, .icon-btn a { text-decoration: none; color: var(--text); }
+
+/* Status chips per production stage */
+.st { font-size: 11px; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg3); white-space: nowrap; }
+.st-confirmed { color: #6fb3f7; border-color: #2f6fb0; }
+.st-artwork { color: #d2a8ff; border-color: #8957e5; }
+.st-queued { color: #e0b341; border-color: #7a6320; }
+.st-printing { color: var(--accent); border-color: var(--accent); }
+.st-finishing { color: #f7a35c; border-color: #b06a2f; }
+.st-qc { color: #79c0ff; border-color: #388bfd; }
+.st-packed { color: #56d364; border-color: #1a5c34; }
+.st-shipped { color: #3fb950; border-color: #2ea043; }
+.st-done { color: var(--green); border-color: var(--green); font-weight: 600; }
+.st-cancelled { color: #f1707a; border-color: var(--red); }
+
+.pay-chip { font-size: 10px; border-radius: 10px; padding: 1px 7px; }
+.pay-paid { background: #0d2818; color: var(--green); border: 1px solid #1a5c34; }
+.pay-deposit { background: #2a2410; color: #e0b341; border: 1px solid #7a6320; }
+.pay-unpaid { background: #3a1212; color: #f1707a; border: 1px solid var(--red); }
+
+/* Production queue (Kanban) — reuses .kcol/.kcard sizing from styles.css */
+.erp-queue { display: flex; gap: 10px; padding: 14px; overflow-x: auto; align-items: flex-start; height: 100%; }
+.erp-queue .kcol { width: 230px; }
+.due-late { color: #f1707a; font-weight: 600; }
+.due-soon { color: #e0b341; }
+
+/* Calculator */
+.calc-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; background: var(--bg2); }
+.calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-items: end; }
+.calc-grid input, .calc-grid select { width: 100%; min-width: 0; }
+.calc-grid label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+.calc-break { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.calc-break .chip { font-size: 11px; }
+.calc-price { font-size: 20px; font-weight: 700; color: var(--green); margin-left: auto; }
+
+/* Job detail */
+.job-cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+@media (max-width: 900px) { .job-cols { grid-template-columns: 1fr; } }
+.tl { border-left: 2px solid var(--border); margin-left: 6px; padding-left: 12px; }
+.tl-item { font-size: 12px; padding: 5px 0; color: var(--muted); }
+.tl-item b { color: var(--text); }
+.status-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.status-btns .btn { font-size: 12px; padding: 6px 10px; }
+
+/* Stock */
+.low-row { background: rgba(218, 54, 51, .08); }
+.low-row td:first-child { border-left: 3px solid var(--red); }
+
+/* Print documents (quote / invoice / receipt / job ticket) */
+.print-wrap { background: #fff; color: #111; max-width: 800px; margin: 20px auto; padding: 36px 42px; border-radius: 8px; }
+.print-wrap h1 { font-size: 22px; margin: 0 0 2px; }
+.print-wrap .doc-head { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 14px; }
+.print-wrap .muted { color: #555; }
+.print-wrap table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+.print-wrap th, .print-wrap td { border: 1px solid #999; padding: 7px 10px; text-align: left; color: #111; }
+.print-wrap th { background: #f0f0f0; font-size: 12px; }
+.print-wrap td.num, .print-wrap th.num { text-align: right; }
+.print-wrap .totals { margin-left: auto; width: 280px; font-size: 13px; }
+.print-wrap .totals td { border: none; padding: 3px 8px; }
+.print-wrap .totals .grand td { border-top: 2px solid #111; font-weight: 700; font-size: 15px; }
+.print-wrap .sig-row { display: flex; justify-content: space-between; margin-top: 48px; gap: 30px; }
+.print-wrap .sig { flex: 1; text-align: center; font-size: 12px; color: #333; }
+.print-wrap .sig .line { border-bottom: 1px dotted #333; height: 40px; margin-bottom: 6px; }
+.print-bar { max-width: 800px; margin: 14px auto 0; display: flex; gap: 8px; }
+@media print {
+  body { background: #fff !important; overflow: visible !important; height: auto !important; }
+  .topbar, .print-bar { display: none !important; }
+  #app { height: auto !important; }
+  #main { overflow: visible !important; }
+  .print-wrap { margin: 0; border-radius: 0; padding: 10mm 8mm; max-width: none; }
+}
+
+/* Misc */
+.erp-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mini-table td, .mini-table th { padding: 6px 8px; font-size: 12px; }
+.clickable { cursor: pointer; }
+.clickable:hover { background: var(--bg3); }
+.inline-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: end; margin-top: 8px; }
+.inline-form input, .inline-form select { min-width: 0; }

@@ -32,10 +32,10 @@ export function seedIfEmpty() {
   const luxuryTeam = db.teams.insert({ id: 'team_luxury', organizationId: O, name: 'Luxury Sales Team', parentId: salesDept.id });
   const supportTeam = db.teams.insert({ id: 'team_support', organizationId: O, name: 'Support Team', parentId: null });
   const marketingTeam = db.teams.insert({ id: 'team_marketing', organizationId: O, name: 'Marketing Team', parentId: null });
-  // Project sales teams — chats from Meta ads whose Ad set name contains the
-  // project code are routed here (see the 'adset' routing rules below).
-  const projRym = db.teams.insert({ id: 'team_proj_rym', organizationId: O, name: 'Sales โครงการ Rhythm (RYM)', parentId: salesDept.id, skills: ['rym'] });
-  const projLpn = db.teams.insert({ id: 'team_proj_lpn', organizationId: O, name: 'Sales โครงการ Lumpini (LPN)', parentId: salesDept.id, skills: ['lpn'] });
+  // Product-line sales teams — chats from Meta ads whose Ad set name contains
+  // the product code are routed here (see the 'adset' routing rules below).
+  const projRym = db.teams.insert({ id: 'team_proj_rym', organizationId: O, name: 'Sales งานฉลากสินค้า (LABEL)', parentId: salesDept.id, skills: ['label'] });
+  const projLpn = db.teams.insert({ id: 'team_proj_lpn', organizationId: O, name: 'Sales งานโลโก้แบรนด์ (LOGO)', parentId: salesDept.id, skills: ['logo'] });
 
   // ── Users (every role) ────────────────────────────────────────────────────
   const demoHash = hashPassword(config.demoPassword);
@@ -150,11 +150,11 @@ export function seedIfEmpty() {
   canned('ขอข้อมูลติดต่อ', 'รบกวนขอชื่อ-เบอร์โทร และที่อยู่สำหรับจัดส่งด้วยนะคะ', '/info');
   canned('ชำระเงิน', 'ชำระผ่านบัญชีธนาคารหรือพร้อมเพย์ได้เลยค่ะ แจ้งสลิปหลังโอนได้เลยนะคะ', '/pay');
 
-  // ── Projects (Ad-set code → project name + sales team) ───────────────────
+  // ── Projects (Ad-set code → product line + sales team) ───────────────────
   const project = (id, name, keywords, teamId) =>
     db.projects.insert({ id, organizationId: O, name, code: keywords[0], keywords, teamId });
-  project('proj_rym', 'Rhythm (RYM)', ['RYM', 'Rhythm', 'ริทึ่ม'], projRym.id);
-  project('proj_lpn', 'Lumpini (LPN)', ['LPN', 'Lumpini', 'ลุมพินี'], projLpn.id);
+  project('proj_rym', 'ฉลากสินค้า (LABEL)', ['LABEL', 'ฉลาก', 'Label'], projRym.id);
+  project('proj_lpn', 'โลโก้แบรนด์ (LOGO)', ['LOGO', 'โลโก้', 'Logo'], projLpn.id);
 
   // ── AI ads optimization — demo ad accounts ───────────────────────────────
   // No credentials → the delivery simulator generates a realistic portfolio
@@ -252,7 +252,7 @@ export function seedIfEmpty() {
     db.autoReplies.insert({ organizationId: org.id, type, text, keywords, channelAccountId: null, enabled: true });
   auto('welcome', 'สวัสดีค่ะ ขอบคุณที่ติดต่อเข้ามานะคะ 🙏 ทีมงานกำลังรีบมาดูแลค่ะ');
   auto('away', 'ขณะนี้อยู่นอกเวลาทำการค่ะ ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุดนะคะ 😊');
-  auto('keyword', 'ราคาเริ่มต้นที่ 2.5 ล้านบาทค่ะ สนใจห้องแบบไหนดีคะ เดี๋ยวทีมขายส่งรายละเอียดให้นะคะ', ['ราคา', 'เท่าไหร่', 'price']);
+  auto('keyword', 'สติกเกอร์เริ่มต้นหลักร้อยค่ะ 💚 รบกวนแจ้ง ขนาด (กว้าง×สูง ซม.) จำนวน และวัสดุ (PVC กันน้ำ / กระดาษ) เดี๋ยวทีมงานตีราคาให้เลยนะคะ', ['ราคา', 'เท่าไหร่', 'price', 'ตีราคา']);
 
   log.info('seed complete: 1 org, ' + db.users.all().length + ' users, ' +
     db.channelAccounts.all().length + ' channel accounts, ' +

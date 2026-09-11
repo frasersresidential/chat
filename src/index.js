@@ -5,6 +5,7 @@ import { createApp } from './server/app.js';
 import { attachRealtime } from './server/realtime.js';
 import { db } from './store/db.js';
 import { seedIfEmpty } from './store/seed.js';
+import { seedErpIfEmpty } from './erp/seed.js';
 import { applyEnvCredentials } from './store/envCredentials.js';
 import { startReminderScheduler } from './core/reminders.js';
 import { startDailyReportScheduler } from './core/dailyReport.js';
@@ -18,6 +19,7 @@ const log = logger('boot');
 await db.init();          // hydrate from Postgres when DATABASE_URL is set
 await initPush();         // set up Web Push when web-push / VAPID are available
 seedIfEmpty();
+seedErpIfEmpty();      // ERP starter catalog (idempotent, runs per-org)
 applyEnvCredentials(); // copy any real keys from .env onto seeded accounts
 
 const app = createApp();

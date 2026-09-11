@@ -134,6 +134,12 @@ async function boot() {
   render();
   refreshTaskBadge();
   if ('Notification' in window && Notification.permission === 'granted') enablePush();
+  // Deep link from ERP: /#conv/<id> opens that conversation in the inbox.
+  if (location.hash.startsWith('#conv/')) {
+    const convId = location.hash.slice('#conv/'.length);
+    history.replaceState(null, '', '/');
+    openThread(convId).catch(() => {});
+  }
 }
 
 async function loadContext() {
@@ -293,6 +299,7 @@ function notifyInbound(message) {
 // ── Router ────────────────────────────────────────────────────────────────────
 function render() {
   const main = $('#main');
+  if (state.view === 'erp') { location.href = '/erp.html'; return; }
   if (state.view === 'ads') return renderAds(main);
   if (state.view === 'inbox') return renderInbox(main);
   if (state.view === 'tasks') return renderTasks(main);
@@ -642,6 +649,9 @@ function renderDetail() {
       ${u.campaign ? `<div class="row"><span class="muted">utm_campaign</span><span>${esc(u.campaign)}</span></div>` : ''}
       ${a.ref ? `<div class="row"><span class="muted">ref</span><span>${esc(a.ref)}</span></div>` : ''}`;
     })() : ''}
+
+    ${editable ? `<a class="btn" style="display:block;text-align:center;margin:4px 0 2px;text-decoration:none"
+      href="/erp.html#new-quote?conv=${c.id}">🧮 ตีราคา / ใบเสนอราคา (ERP)</a>` : ''}
 
     <h4>Pipeline stage</h4>
     <select id="stageSel" ${editable ? '' : 'disabled'}>
