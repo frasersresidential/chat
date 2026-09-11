@@ -99,7 +99,7 @@ function showLogin(err) {
     <input id="liEmail" type="email" placeholder="อีเมล" value="u_owner@company-a.com" autocomplete="username" />
     <input id="liPass" type="password" placeholder="รหัสผ่าน" value="demo1234" autocomplete="current-password" />
     <button class="btn" type="submit" style="width:100%">เข้าสู่ระบบ</button>
-    <div class="login-hint">เดโม: <b>u_owner@company-a.com</b> / <b>demo1234</b><br/>ลองบทบาทอื่น: u_manager, u_supervisor, u_sales1, u_viewer (รหัสเดียวกัน)</div>
+    <div class="login-hint">ผู้ใช้: <b>u_owner@company-a.com</b> · รหัสผ่านตามที่ตั้งไว้ใน <b>DEMO_PASSWORD</b> (ค่าเริ่มต้น demo1234)<br/>บทบาทอื่น: u_manager, u_supervisor, u_sales1, u_viewer (รหัสเดียวกัน)</div>
   </form>`;
   $('#loginForm').onsubmit = async (e) => {
     e.preventDefault();

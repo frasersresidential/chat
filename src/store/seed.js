@@ -1,6 +1,6 @@
 import { db } from './db.js';
 import { PRESENCE } from '../core/presence.js';
-import { hashPassword } from '../core/auth.js';
+import { hashPassword, verifyPassword } from '../core/auth.js';
 import { defaultBusinessHours } from '../core/businessHours.js';
 import { defaultDailyReport } from '../core/dailyReport.js';
 import { defaultSla } from '../core/sla.js';
@@ -259,4 +259,20 @@ export function seedIfEmpty() {
     db.routingRules.all().length + ' routing rules, ' +
     db.cannedResponses.all().length + ' canned replies, ' +
     db.autoReplies.all().length + ' auto-replies');
+}
+
+/**
+ * Keep the seeded demo accounts' password equal to DEMO_PASSWORD on every
+ * boot, so the value shown in the hosting dashboard is always the one that
+ * works — and changing it there is a real password reset. Runs only on the
+ * demo accounts (…@company-a.com); real staff accounts are never touched.
+ */
+export function syncDemoPasswords() {
+  let n = 0;
+  for (const u of db.users.filter((x) => (x.email || '').endsWith('@company-a.com'))) {
+    if (verifyPassword(config.demoPassword, u.passwordHash)) continue;
+    db.users.update(u.id, { passwordHash: hashPassword(config.demoPassword) });
+    n++;
+  }
+  if (n) log.info(`DEMO_PASSWORD applied to ${n} demo account(s)`);
 }
